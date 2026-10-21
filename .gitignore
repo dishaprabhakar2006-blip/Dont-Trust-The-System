@@ -1,0 +1,35 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Firebase credentials
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+*-adminsdk-*.json
+firebase-credentials*.json
+service-account*.json
+*-service-account*.json
+*serviceAccount*.json
+
+# Editor and operating-system files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
