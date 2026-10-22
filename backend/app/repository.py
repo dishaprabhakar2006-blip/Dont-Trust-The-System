@@ -23,6 +23,7 @@ class TeamRepository(Protocol):
 
     def update(self, team_id: str, updater: TeamUpdater) -> Team | None: ...
 
+    def list_all(self) -> list[Team]: ...
 
 class InMemoryTeamRepository:
     """Thread-safe local store that returns copies to prevent unsafe mutation."""
@@ -65,6 +66,10 @@ class InMemoryTeamRepository:
             updater(updated)
             self._teams[team_id] = deepcopy(updated)
             return deepcopy(updated)
+
+    def list_all(self) -> list[Team]:
+        with self._lock:
+            return [deepcopy(team) for team in self._teams.values()]
 
 
 class FirebaseTeamRepository:
@@ -162,3 +167,12 @@ def create_repository_from_env() -> TeamRepository:
             credentials.ApplicationDefault(), options
         )
     return FirebaseTeamRepository(db, firebase_app)
+
+def list_all(self) -> list[Team]:
+    value = self._ref("teams").get() or {}
+    teams = []
+    for item in value.values():
+        team = self._to_model(item)
+        if team is not None:
+            teams.append(team)
+    return teams

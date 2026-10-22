@@ -21,6 +21,8 @@ from backend.app.models import Player, Team
 class PlayerInput(BaseModel):
     player_name: str = Field(min_length=1, max_length=40)
 
+class CreateTeamInput(PlayerInput):
+    team_name: str | None = Field(default=None, max_length=40)
 
 class JoinTeamInput(PlayerInput):
     join_code: str = Field(min_length=1, max_length=12)
@@ -232,15 +234,18 @@ def read_health() -> dict[str, str]:
     "/teams",
     status_code=status.HTTP_201_CREATED,
 )
-def create_team(payload: PlayerInput) -> dict:
+def create_team(payload: CreateTeamInput) -> dict:
     """Create a team and assign its first player as Analyst."""
     team_id = str(uuid4())
     join_code = _new_join_code()
     now = utc_now()
-
+    team_name = (payload.team_name or "").strip() or (
+        f"{payload.player_name.strip()}'s team"
+    )
     team = Team(
         team_id=team_id,
         join_code=join_code,
+        team_name=team_name,
         players=[
             Player(
                 player_id=str(uuid4()),
@@ -542,3 +547,38 @@ def get_team_results(team_id: str) -> dict:
         "final": team.game_status in {"completed", "expired"},
         **_timer_values(team, utc_now()),
     }
+# --------------------------------------------------
+# Leaderboard
+# --------------------------------------------------
+
+@app.get("/leaderboard")
+def get_leaderboard() -> list[dict]:
+    """Public ranking: score descending, then time taken ascending."""
+    now = utc_now()
+    rows = []
+
+    for team in repository.list_all():
+        if team.started_at is None:
+            time_taken = 0
+        else:
+            deadline = team.started_at + timedelta(
+                seconds=team.duration_seconds
+            )
+            end = team.completed_at or min(now, deadline)
+            time_taken = max(
+                0, math.floor((end - team.started_at).total_seconds())
+            )
+
+        rows.append(
+            {
+                "team_name": team.team_name or "Unnamed team",
+                "score": team.score,
+                "current_stage": team.current_stage,
+                "game_status": team.game_status,
+                "time_taken_seconds": time_taken,
+            }
+        )
+
+    rows.sort(key=lambda row: (-row["score"], row["time_taken_seconds"]))
+
+    return [{"rank": index, **row} for index, row in enumerate(rows, start=1)]

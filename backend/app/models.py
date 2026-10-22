@@ -14,6 +14,7 @@ class Player(BaseModel):
 class Team(BaseModel):
     team_id: str
     join_code: str
+    team_name: str = ""
     players: list[Player]
     current_stage: int = 1
     game_status: str = "waiting_for_players"
