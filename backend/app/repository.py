@@ -25,6 +25,7 @@ class TeamRepository(Protocol):
 
     def list_all(self) -> list[Team]: ...
 
+
 class InMemoryTeamRepository:
     """Thread-safe local store that returns copies to prevent unsafe mutation."""
 
@@ -131,6 +132,15 @@ class FirebaseTeamRepository:
         updater(team)
         return cls._to_dict(team)
 
+    def list_all(self) -> list[Team]:
+        value = self._ref("teams").get() or {}
+        teams = []
+        for item in value.values():
+            team = self._to_model(item)
+            if team is not None:
+                teams.append(team)
+        return teams
+
 
 def create_repository_from_env() -> TeamRepository:
     """Select Firebase when configured; otherwise use the local memory store."""
@@ -161,18 +171,7 @@ def create_repository_from_env() -> TeamRepository:
         credential = credentials.Certificate(service_account_path)
         firebase_app = firebase_admin.initialize_app(credential, options)
     else:
-        # Uses GOOGLE_APPLICATION_CREDENTIALS or the platform's Application
-        # Default Credentials (for example, an attached service identity).
         firebase_app = firebase_admin.initialize_app(
             credentials.ApplicationDefault(), options
         )
     return FirebaseTeamRepository(db, firebase_app)
-
-def list_all(self) -> list[Team]:
-    value = self._ref("teams").get() or {}
-    teams = []
-    for item in value.values():
-        team = self._to_model(item)
-        if team is not None:
-            teams.append(team)
-    return teams

@@ -13,10 +13,11 @@ def _team(client, name, p1, p2):
     team = client.post(
         "/teams", json={"player_name": p1, "team_name": name}
     ).json()
-    client.post(
+    joined = client.post(
         "/teams/join",
         json={"player_name": p2, "join_code": team["join_code"]},
-    )
+    ).json()
+    team["players"] = joined["players"]
     return team
 
 
@@ -34,14 +35,18 @@ def test_leaderboard_ranks_by_score_and_hides_private_fields(monkeypatch):
     analyst_id = alpha["players"][0]["player_id"]
     response = client.post(
         f"/teams/{alpha['team_id']}/actions",
-        json={"player_id": analyst_id, "answer": "hydra"},
+        json={
+            "player_id": analyst_id,
+            "question_id": "a1",
+            "answer": "novadb02_4471_1410",
+        },
     )
     assert response.status_code == 200
 
     rows = client.get("/leaderboard").json()
     assert [row["team_name"] for row in rows] == ["Alpha", "Beta"]
     assert [row["rank"] for row in rows] == [1, 2]
-    assert rows[0]["score"] == 5
+    assert rows[0]["score"] == 2
     for row in rows:
         assert set(row) == {
             "rank",
