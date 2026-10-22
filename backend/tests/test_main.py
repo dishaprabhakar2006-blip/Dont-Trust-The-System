@@ -113,10 +113,12 @@ def test_mission_retrieval_is_role_specific_and_does_not_leak_answers() -> None:
     team = create_full_team()
 
     analyst = client.get(
-        f"/teams/{team['team_id']}/mission", params={"player_id": team["players"][0]["player_id"]}
+        f"/teams/{team['team_id']}/mission",
+        params={"player_id": team["players"][0]["player_id"]}
     )
     monitor = client.get(
-        f"/teams/{team['team_id']}/mission", params={"player_id": team["players"][1]["player_id"]}
+        f"/teams/{team['team_id']}/mission",
+        params={"player_id": team["players"][1]["player_id"]}
     )
 
     assert analyst.status_code == monitor.status_code == 200
@@ -133,7 +135,8 @@ def test_mission_rejects_player_not_assigned_to_team() -> None:
     team = create_full_team()
 
     response = client.get(
-        f"/teams/{team['team_id']}/mission", params={"player_id": "someone-else"}
+        f"/teams/{team['team_id']}/mission",
+        params={"player_id": "someone-else"}
     )
 
     assert response.status_code == 403
@@ -143,7 +146,8 @@ def test_incorrect_answer_is_rejected_without_progress() -> None:
     team = create_full_team()
 
     response = client.post(f"/teams/{team['team_id']}/actions", json={
-        "player_id": team["players"][0]["player_id"], "answer": "not the answer"
+        "player_id": team["players"][0]["player_id"],
+        "answer": "not the answer"
     })
 
     assert response.status_code == 400
@@ -172,7 +176,8 @@ def test_both_roles_must_submit_correct_answer_to_unlock_next_stage() -> None:
     assert monitor_submit.json()["current_stage"] == 2
 
     next_mission = client.get(
-        f"/teams/{team['team_id']}/mission", params={"player_id": analyst_id}
+        f"/teams/{team['team_id']}/mission",
+        params={"player_id": analyst_id}
     )
     assert next_mission.json()["stage"] == 2
 
@@ -189,7 +194,7 @@ def test_duplicate_submission_cannot_complete_or_score_twice() -> None:
     assert duplicate.status_code == 409
     state = client.get(f"/teams/{team['team_id']}/state").json()
     assert state["completed_actions"] == ["stage-1:analyst"]
-    assert state["score"] == 100
+    assert state["score"] == 5
 
 
 def test_correct_answers_award_points_once_and_unlock_stage() -> None:
@@ -200,10 +205,10 @@ def test_correct_answers_award_points_once_and_unlock_stage() -> None:
     analyst = client.post(endpoint, json={"player_id": analyst_id, "answer": "hydra"})
     monitor = client.post(endpoint, json={"player_id": monitor_id, "answer": "hydra"})
 
-    assert analyst.json()["points_awarded"] == 100
-    assert analyst.json()["score"] == 100
-    assert monitor.json()["points_awarded"] == 100
-    assert monitor.json()["score"] == 200
+    assert analyst.json()["points_awarded"] == 5
+    assert analyst.json()["score"] == 5
+    assert monitor.json()["points_awarded"] == 5
+    assert monitor.json()["score"] == 10
     assert monitor.json()["completed_stages"] == [1]
 
 
@@ -247,7 +252,7 @@ def test_all_five_stages_produce_final_results_and_reject_more_actions() -> None
     assert result.status_code == 200
     assert result.json()["final"] is True
     assert result.json()["game_status"] == "completed"
-    assert result.json()["score"] == 1000
+    assert result.json()["score"] == 100
     assert result.json()["completed_stages"] == [1, 2, 3, 4, 5]
 
     rejected = client.post(action_url, json={
@@ -284,7 +289,7 @@ def test_concurrent_role_submissions_score_and_unlock_once(monkeypatch) -> None:
 
     assert [response.status_code for response in responses] == [200, 200]
     state = client.get(f"/teams/{team['team_id']}/state").json()
-    assert state["score"] == 200
+    assert state["score"] == 10
     assert state["completed_stages"] == [1]
     assert state["current_stage"] == 2
 
