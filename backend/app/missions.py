@@ -84,25 +84,74 @@ MISSIONS = {
     # ---- Stages 2-5: old one-question format, converted below. ----
     # Rewrite these one at a time into the Stage 1 format.
     2: {
-        "title": "The Quiet Connection",
+        "title": "The Vault",
         "roles": {
             "Analyst": {
-                "instructions": "Use the fictional log entries to identify the account that opened the quarantined note.",
+                "instructions": (
+                    "You found the attacker's hidden folder. It holds a locked vault. "
+                    "You can see its question, but the answer is in your partner's login "
+                    "records. Talk to each other!"
+                ),
                 "evidence": [
-                    "Lab log: 09:12 local — user avery.park opened case note NC-204.",
-                    "Lab log: 09:14 local — Hydra_Update quarantined before execution.",
+                    {"text": "FOLDER: /home/.cache_old/ contains vault.bin (locked) and readme.tmp", "after": None},
+                    {"text": "readme.tmp: 'cleanup scheduled. do not trust the banner.'", "after": None},
+                    {"text": "VAULT PROMPT: 'Which user logged in at 03:07 AM from an unknown IP?'", "after": None},
+                    {"text": "VAULT STATUS: the answer must be a username. You have no login records. Ask your partner.", "after": None},
+                    {"text": "VAULT OPENED. FRAGMENT 2: KS-19C4 (write this down!)", "after": "a1"},
+                    {"text": "VAULT NOTE (encoded): WDVN DUFKLYHLQGHA UXQV DIWHU FOHDQXS", "after": "a1"},
+                    {"text": "NOTE HEADER: Caesar cipher. Every letter was moved 3 places forward in the alphabet.", "after": "a1"},
                 ],
-                "question": "Which account opened case note NC-204?",
-                "answer_key": "avery.park",
+                "questions": [
+                    {
+                        "id": "a1",
+                        "prompt": "Enter the vault answer: which user logged in at 03:07 AM from an unknown IP?",
+                        "answers": ["svc_backup01"],
+                        "points": 3,
+                        "after": None,
+                        "hint": "Your partner's login records show who connected at 03:07 from outside the company network.",
+                    },
+                    {
+                        "id": "a2",
+                        "prompt": "Decode the vault note. Which scheduled task does it name?",
+                        "answers": ["archiveindex"],
+                        "points": 4,
+                        "after": "a1",
+                        "hint": "Shift each letter back by 3 (D becomes A). Decode the second word.",
+                    },
+                ],
             },
             "Monitor": {
-                "instructions": "Review the simulated gateway log and identify the blocked destination label.",
+                "instructions": (
+                    "You have the login records. Your partner is stuck at a locked vault "
+                    "that asks a question only your records can answer. Help them!"
+                ),
                 "evidence": [
-                    "Training gateway: simulated request to 198.51.100.24 labeled NC-204.",
-                    "Disposition: reserved documentation address; request blocked in the simulation.",
+                    {"text": "NETWORK NOTE: company addresses start with 10.0.4. Anything else is external.", "after": None},
+                    {"text": "LOGIN RECORDS 14 Oct 2026: 02:30:00 maria.dsouza 10.0.4.50 (maintenance window, approved)", "after": None},
+                    {"text": "LOGIN RECORDS: 03:07:41 svc_backup01 203.0.113.77 session opened", "after": None},
+                    {"text": "LOGIN RECORDS: 03:17:22 backup-agent 10.0.4.9 heartbeat", "after": None},
+                    {"text": "LOGIN RECORDS: 09:02:11 avery.park 10.0.4.21 login ok", "after": None},
+                    {"text": "LOGIN RECORDS: 13:07:15 jordan.lee 10.0.4.35 login ok", "after": None},
+                    {"text": "ACCOUNT AUDIT: svc_backup01 was created on 02 Oct 2026. No HR service-account request on file.", "after": "m1"},
                 ],
-                "question": "What case label is attached to the blocked request?",
-                "answer_key": "nc-204",
+                "questions": [
+                    {
+                        "id": "m1",
+                        "prompt": "Which user logged in at 03:07 AM from an address outside the company network?",
+                        "answers": ["svc_backup01"],
+                        "points": 4,
+                        "after": None,
+                        "hint": "Company addresses start with 10.0.4. Find the 03:07 row (not 13:07).",
+                    },
+                    {
+                        "id": "m2",
+                        "prompt": "When was svc_backup01 created? Enter the date as DDMM.",
+                        "answers": ["0210"],
+                        "points": 4,
+                        "after": "m1",
+                        "hint": "Day first, then month: 2 October.",
+                    },
+                ],
             },
         },
     },
