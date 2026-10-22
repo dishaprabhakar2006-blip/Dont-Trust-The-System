@@ -10,6 +10,8 @@ from backend.app.repository import InMemoryTeamRepository
 
 client = TestClient(app)
 
+PASSWORD = "novadb02_4471_1410"
+
 
 def test_health_endpoint_returns_healthy_status() -> None:
     response = client.get("/health")
@@ -127,8 +129,14 @@ def test_mission_retrieval_is_role_specific_and_does_not_leak_answers() -> None:
     for mission in [analyst.json(), monitor.json()]:
         serialized = str(mission).lower()
         assert "answer_key" not in serialized
-        assert "jordan.lee" not in serialized
-        assert "secret" not in serialized
+        assert "'answers'" not in serialized
+        assert "'hint'" not in serialized
+        assert PASSWORD not in serialized
+        assert "ks-a7f3" not in serialized
+        assert "203.0.113.77" not in serialized  # hidden until login
+    # Locked questions are not even listed before login.
+    assert [q["id"] for q in analyst.json()["questions"]] == ["a1"]
+    assert [q["id"] for q in monitor.json()["questions"]] == ["m1"]
 
 
 def test_mission_rejects_player_not_assigned_to_team() -> None:
@@ -147,12 +155,14 @@ def test_incorrect_answer_is_rejected_without_progress() -> None:
 
     response = client.post(f"/teams/{team['team_id']}/actions", json={
         "player_id": team["players"][0]["player_id"],
+        "question_id": "a1",
         "answer": "not the answer"
     })
 
     assert response.status_code == 400
     state = client.get(f"/teams/{team['team_id']}/state").json()
     assert state["current_stage"] == 1
+    assert state["score"] == 0
     assert state["completed_actions"] == []
 
 
@@ -160,20 +170,33 @@ def test_both_roles_must_submit_correct_answer_to_unlock_next_stage() -> None:
     team = create_full_team()
     analyst_id = team["players"][0]["player_id"]
     monitor_id = team["players"][1]["player_id"]
+    url = f"/teams/{team['team_id']}/actions"
 
-    analyst_submit = client.post(f"/teams/{team['team_id']}/actions", json={
-        "player_id": analyst_id, "answer": "Hydra"
+    a1 = client.post(url, json={
+        "player_id": analyst_id, "question_id": "a1", "answer": PASSWORD.upper()
     })
-    assert analyst_submit.status_code == 200
-    assert analyst_submit.json()["stage_completed"] is False
-    assert analyst_submit.json()["current_stage"] == 1
+    assert a1.status_code == 200
+    assert a1.json()["stage_completed"] is False
 
-    monitor_submit = client.post(f"/teams/{team['team_id']}/actions", json={
-        "player_id": monitor_id, "answer": "hydra"
+    m1 = client.post(url, json={
+        "player_id": monitor_id, "question_id": "m1", "answer": PASSWORD
     })
-    assert monitor_submit.status_code == 200
-    assert monitor_submit.json()["stage_completed"] is True
-    assert monitor_submit.json()["current_stage"] == 2
+    assert m1.status_code == 200
+    assert m1.json()["stage_completed"] is False
+    assert m1.json()["current_stage"] == 1
+
+    a2 = client.post(url, json={
+        "player_id": analyst_id, "question_id": "a2", "answer": "KS-A7F3"
+    })
+    assert a2.status_code == 200
+    assert a2.json()["stage_completed"] is False
+
+    m2 = client.post(url, json={
+        "player_id": monitor_id, "question_id": "m2", "answer": "203.0.113.77"
+    })
+    assert m2.status_code == 200
+    assert m2.json()["stage_completed"] is True
+    assert m2.json()["current_stage"] == 2
 
     next_mission = client.get(
         f"/teams/{team['team_id']}/mission",
@@ -186,15 +209,15 @@ def test_duplicate_submission_cannot_complete_or_score_twice() -> None:
     team = create_full_team()
     player_id = team["players"][0]["player_id"]
     endpoint = f"/teams/{team['team_id']}/actions"
+    body = {"player_id": player_id, "question_id": "a1", "answer": PASSWORD}
 
-    first = client.post(endpoint, json={"player_id": player_id, "answer": "hydra"})
-    duplicate = client.post(endpoint, json={"player_id": player_id, "answer": "hydra"})
+    first = client.post(endpoint, json=body)
+    duplicate = client.post(endpoint, json=body)
 
     assert first.status_code == 200
     assert duplicate.status_code == 409
     state = client.get(f"/teams/{team['team_id']}/state").json()
-    assert state["completed_actions"] == ["stage-1:analyst"]
-    assert state["score"] == 5
+    assert state["score"] == 2
 
 
 def test_correct_answers_award_points_once_and_unlock_stage() -> None:
@@ -202,14 +225,22 @@ def test_correct_answers_award_points_once_and_unlock_stage() -> None:
     analyst_id, monitor_id = [player["player_id"] for player in team["players"]]
     endpoint = f"/teams/{team['team_id']}/actions"
 
-    analyst = client.post(endpoint, json={"player_id": analyst_id, "answer": "hydra"})
-    monitor = client.post(endpoint, json={"player_id": monitor_id, "answer": "hydra"})
+    a1 = client.post(endpoint, json={
+        "player_id": analyst_id, "question_id": "a1", "answer": PASSWORD})
+    m1 = client.post(endpoint, json={
+        "player_id": monitor_id, "question_id": "m1", "answer": PASSWORD})
+    assert a1.json()["points_awarded"] == 2
+    assert m1.json()["points_awarded"] == 2
 
-    assert analyst.json()["points_awarded"] == 5
-    assert analyst.json()["score"] == 5
-    assert monitor.json()["points_awarded"] == 5
-    assert monitor.json()["score"] == 10
-    assert monitor.json()["completed_stages"] == [1]
+    a2 = client.post(endpoint, json={
+        "player_id": analyst_id, "question_id": "a2", "answer": "ks-a7f3"})
+    m2 = client.post(endpoint, json={
+        "player_id": monitor_id, "question_id": "m2", "answer": "203.0.113.77"})
+    assert a2.json()["points_awarded"] == 3
+    assert m2.json()["points_awarded"] == 3
+    assert m2.json()["score"] == 10
+    assert m2.json()["completed_stages"] == [1]
+    assert m2.json()["current_stage"] == 2
 
 
 def test_timer_expiry_prevents_scoring_and_progress(monkeypatch) -> None:
@@ -224,7 +255,7 @@ def test_timer_expiry_prevents_scoring_and_progress(monkeypatch) -> None:
     current += timedelta(seconds=31)
     state = client.get(f"/teams/{team['team_id']}/state").json()
     submission = client.post(f"/teams/{team['team_id']}/actions", json={
-        "player_id": player_id, "answer": "hydra"
+        "player_id": player_id, "question_id": "a1", "answer": PASSWORD
     })
 
     assert state["game_status"] == "expired"
@@ -242,11 +273,13 @@ def test_all_five_stages_produce_final_results_and_reject_more_actions() -> None
 
     for stage in range(1, 6):
         for role in ("Analyst", "Monitor"):
-            answer = MISSIONS[stage]["roles"][role]["answer_key"]
-            response = client.post(action_url, json={
-                "player_id": players[role], "answer": answer
-            })
-            assert response.status_code == 200
+            for q in MISSIONS[stage]["roles"][role]["questions"]:
+                response = client.post(action_url, json={
+                    "player_id": players[role],
+                    "question_id": q["id"],
+                    "answer": q["answers"][0],
+                })
+                assert response.status_code == 200
 
     result = client.get(f"/teams/{team['team_id']}/results")
     assert result.status_code == 200
@@ -256,7 +289,7 @@ def test_all_five_stages_produce_final_results_and_reject_more_actions() -> None
     assert result.json()["completed_stages"] == [1, 2, 3, 4, 5]
 
     rejected = client.post(action_url, json={
-        "player_id": players["Analyst"], "answer": "jordan.lee"
+        "player_id": players["Analyst"], "question_id": "q1", "answer": "jordan.lee"
     })
     assert rejected.status_code == 409
 
@@ -279,25 +312,34 @@ def test_concurrent_role_submissions_score_and_unlock_once(monkeypatch) -> None:
     monkeypatch.setattr(main, "repository", InMemoryTeamRepository())
     team = create_full_team()
     url = f"/teams/{team['team_id']}/actions"
-    players = [player["player_id"] for player in team["players"]]
+    jobs = [
+        (team["players"][0]["player_id"], "a1"),
+        (team["players"][1]["player_id"], "m1"),
+    ]
 
-    def submit(player_id):
-        return client.post(url, json={"player_id": player_id, "answer": "hydra"})
+    def submit(job):
+        player_id, question_id = job
+        return client.post(url, json={
+            "player_id": player_id,
+            "question_id": question_id,
+            "answer": PASSWORD,
+        })
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        responses = list(pool.map(submit, players))
+        responses = list(pool.map(submit, jobs))
 
     assert [response.status_code for response in responses] == [200, 200]
     state = client.get(f"/teams/{team['team_id']}/state").json()
-    assert state["score"] == 10
-    assert state["completed_stages"] == [1]
-    assert state["current_stage"] == 2
+    assert state["score"] == 4
+    assert state["completed_stages"] == []
+    assert state["current_stage"] == 1
 
 
 def test_client_cannot_inject_score_or_stage_and_invalid_action_is_rejected() -> None:
     team = create_full_team()
     response = client.post(f"/teams/{team['team_id']}/actions", json={
         "player_id": team["players"][0]["player_id"],
+        "question_id": "a1",
         "answer": "incorrect",
         "score": 999999,
         "stage": 5,
@@ -362,7 +404,62 @@ def test_action_cannot_claim_another_teams_player() -> None:
     second = create_full_team()
 
     response = client.post(f"/teams/{first['team_id']}/actions", json={
-        "player_id": second["players"][0]["player_id"], "answer": "hydra"
+        "player_id": second["players"][0]["player_id"],
+        "question_id": "a1",
+        "answer": PASSWORD,
     })
 
     assert response.status_code == 403
+
+
+# ---------------- New tests: lockout, locked questions, hints ----------------
+
+def test_five_wrong_answers_lock_the_question() -> None:
+    team = create_full_team()
+    player_id = team["players"][0]["player_id"]
+    url = f"/teams/{team['team_id']}/actions"
+    wrong = {"player_id": player_id, "question_id": "a1", "answer": "nope"}
+
+    for _ in range(4):
+        assert client.post(url, json=wrong).status_code == 400
+
+    fifth = client.post(url, json=wrong)
+    assert fifth.status_code == 400
+    assert "Locked" in fifth.json()["detail"]
+
+    # Even the correct answer is refused while the question is locked.
+    locked = client.post(url, json={
+        "player_id": player_id, "question_id": "a1", "answer": PASSWORD
+    })
+    assert locked.status_code == 429
+
+
+def test_locked_question_cannot_be_answered_before_login() -> None:
+    team = create_full_team()
+
+    response = client.post(f"/teams/{team['team_id']}/actions", json={
+        "player_id": team["players"][0]["player_id"],
+        "question_id": "a2",
+        "answer": "ks-a7f3",
+    })
+
+    assert response.status_code == 404
+
+
+def test_hint_costs_one_point_once() -> None:
+    team = create_full_team()
+    player_id = team["players"][0]["player_id"]
+    client.post(f"/teams/{team['team_id']}/actions", json={
+        "player_id": player_id, "question_id": "a1", "answer": PASSWORD
+    })  # score 2, unlocks a2
+
+    hint_url = f"/teams/{team['team_id']}/hint"
+    body = {"player_id": player_id, "question_id": "a2"}
+
+    first = client.post(hint_url, json=body)
+    second = client.post(hint_url, json=body)
+
+    assert first.status_code == 200
+    assert first.json()["hint"]
+    assert first.json()["score"] == 1
+    assert second.json()["score"] == 1  # asking again is free
