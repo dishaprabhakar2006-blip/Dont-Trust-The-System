@@ -156,25 +156,92 @@ MISSIONS = {
         },
     },
     3: {
-        "title": "A Pattern in the Records",
+        "title": "The Phish",
         "roles": {
             "Analyst": {
-                "instructions": "Compare the fictional access records and identify the account with repeated after-hours access.",
+                "instructions": (
+                    "You are in the server's /tmp folder. Your partner has the inbox. "
+                    "Compare notes before you touch anything."
+                ),
                 "evidence": [
-                    "Training audit: avery.park signed out at 17:02 on all reviewed days.",
-                    "Training audit: jordan.lee accessed archive index at 22:11 on three reviewed days.",
+                    {"text": "TERMINAL: ls -la /tmp", "after": None},
+                    {"text": "FILES: .leave_notice.txt  idx_task.cfg  hydra_stub.bin  sess_91ac.tmp  cache_88.tmp", "after": None},
+                    {"text": "hydra_stub.bin: placeholder file, zero network functions. Not a real payload.", "after": None},
+                    {"text": "idx_task.cfg: name=ArchiveIndex trigger=after_cleanup", "after": None},
+                    {"text": "sess_91ac.tmp: (empty)", "after": None},
+                    {"text": "cache_88.tmp: cache rebuilt 08:55 ok", "after": None},
+                    {"text": ".leave_notice.txt: 'HR: employee EMP-5120 is on approved leave from 13 Oct to 17 Oct 2026. Do not contact.'", "after": None},
+                    {"text": "LOG: partner flagged the inbox message. Ask the Monitor for the fragment.", "after": "a2"},
                 ],
-                "question": "Which account has repeated after-hours archive access?",
-                "answer_key": "jordan.lee",
+                "questions": [
+                    {
+                        "id": "a1",
+                        "prompt": "Which file in /tmp mentions an employee who should be on leave?",
+                        "answers": [".leave_notice.txt", "leave_notice.txt"],
+                        "points": 2,
+                        "after": None,
+                        "hint": "Look at the file names. One of them is about HR.",
+                    },
+                    {
+                        "id": "a2",
+                        "prompt": "Which employee ID is named in that file? (format EMP-1234)",
+                        "answers": ["emp-5120", "5120"],
+                        "points": 2,
+                        "after": "a1",
+                        "hint": "Read the contents of the leave notice.",
+                    },
+                    {
+                        "id": "a3",
+                        "prompt": "Enter fragment 3. Your partner gets it once they decide what to do with the email.",
+                        "answers": ["ks-7b20"],
+                        "points": 3,
+                        "after": "a2",
+                        "hint": "Ask the Monitor what they decided about the email. The fragment starts with KS-.",
+                    },
+                ],
             },
             "Monitor": {
-                "instructions": "Compare simulated alert records and identify the repeated case label.",
+                "instructions": (
+                    "An urgent email just arrived in your inbox. Your partner is in the "
+                    "server's /tmp folder. Do not act on it until you have checked it."
+                ),
                 "evidence": [
-                    "Training alerts: NC-204 appears in three separate archive-index notices.",
-                    "All listed destinations use reserved documentation ranges and are non-routable in this game.",
+                    {"text": "INBOX: 1 new URGENT message", "after": None},
+                    {"text": "FROM: it.admin@nov4corp.example   TO: monitor@novacorp.example   SENT: 14 Oct 2026 03:20", "after": None},
+                    {"text": "SUBJECT: URGENT - Hydra is in /tmp. Delete everything there NOW", "after": None},
+                    {"text": "BODY: 'Hydra is running from /tmp. Delete every file in /tmp immediately before it spreads. Tell no one. - IT Sysadmin'", "after": None},
+                    {"text": "STAFF DIRECTORY: the real company domain is novacorp.example", "after": None},
+                    {"text": "TIMELINE: Hydra email first opened 09:12. Hydra alert fired 09:14.", "after": None},
+                    {"text": "ROSTER: EMP-4471 avery.park, EMP-5120 jordan.lee, EMP-3308 maria.dsouza", "after": None},
+                    {"text": "MAIL LOG: jordan.lee (EMP-5120) opened the Hydra email at 09:31 on 14 Oct.", "after": None},
+                    {"text": "EMAIL FLAGGED AS PHISHING. FRAGMENT 3: KS-7B20 (tell your partner!)", "after": "m3"},
                 ],
-                "question": "Which case label repeats in the archive-index notices?",
-                "answer_key": "nc-204",
+                "questions": [
+                    {
+                        "id": "m1",
+                        "prompt": "What fake domain does the email's sender address use?",
+                        "answers": ["nov4corp.example"],
+                        "points": 2,
+                        "after": None,
+                        "hint": "Compare the sender's domain with the real one in the staff directory, letter by letter.",
+                    },
+                    {
+                        "id": "m2",
+                        "prompt": "The Hydra alert fired at 09:14. At what time was this email sent? (HH:MM)",
+                        "answers": ["03:20", "0320"],
+                        "points": 3,
+                        "after": "m1",
+                        "hint": "Check the SENT field. It is hours before the alert.",
+                    },
+                    {
+                        "id": "m3",
+                        "prompt": "Should you delete the files in /tmp as the email asks? Type delete or keep.",
+                        "answers": ["keep"],
+                        "points": 3,
+                        "after": "m2",
+                        "hint": "The email is fake, so the files in /tmp are evidence. Do not destroy evidence.",
+                    },
+                ],
             },
         },
     },

@@ -519,3 +519,12 @@ def get_leaderboard() -> list[dict]:
     rows.sort(key=lambda row: (-row["score"], row["time_taken_seconds"]))
 
     return [{"rank": index, **row} for index, row in enumerate(rows, start=1)]
+
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+app.mount(
+       "/play",
+       StaticFiles(directory=Path(__file__).parent / "static", html=True),
+       name="play",
+   )

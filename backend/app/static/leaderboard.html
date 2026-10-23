@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard · Don’t Trust the System</title>
+<style>
+  :root{--ink:#0f1a1f;--panel:#16252c;--line:#2a3f48;--text:#dfe8ec;--dim:#8aa0aa;--signal:#f2a541;--ok:#5fd0b0;
+    --ui:"Segoe UI",system-ui,sans-serif;--mono:"Cascadia Mono",Consolas,monospace}
+  *{box-sizing:border-box}
+  html{font-size:clamp(14px,1.45vw,26px)}
+  body{margin:0;background:var(--ink);color:var(--text);font-family:var(--ui);padding:2rem 3rem}
+  header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.2rem}
+  h1{margin:0;font-size:2.2rem}
+  h1 span{color:var(--signal)}
+  #upd{color:var(--dim);font-size:.9rem}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;color:var(--dim);font-weight:500;padding:.5rem 1rem;border-bottom:2px solid var(--line)}
+  td{padding:.75rem 1rem;border-bottom:1px solid var(--line);font-size:1.3rem}
+  td:first-child,td.score{font-family:var(--mono);font-weight:700}
+  td.score{color:var(--ok);font-size:1.5rem}
+  tr.top td{background:var(--panel);font-weight:700}
+  tr.top:nth-child(1) td:first-child{color:var(--signal);font-size:1.7rem}
+  .empty{color:var(--dim);padding:2rem 1rem;font-size:1.2rem}
+</style>
+</head>
+<body>
+<header>
+  <h1>Don’t Trust the <span>System</span></h1>
+  <div id="upd">Loading...</div>
+</header>
+<table>
+  <thead><tr><th>Rank</th><th>Team</th><th>Score</th><th>Stage</th><th>Time</th><th>Status</th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div id="empty" class="empty" hidden>No teams yet. The board fills in as teams join.</div>
+
+<script>
+const label = {in_progress:"Playing", completed:"Finished", waiting_for_players:"Waiting for partner", expired:"Time up"};
+const fmt = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+
+async function load(){
+  try{
+    const res = await fetch("/leaderboard");
+    const rows = await res.json();
+    const body = document.getElementById("rows"); body.innerHTML = "";
+    document.getElementById("empty").hidden = rows.length > 0;
+    rows.forEach(t => {
+      const tr = document.createElement("tr"); if(t.rank <= 3) tr.className = "top";
+      [t.rank, t.team_name, t.score, t.current_stage + " / 5", fmt(t.time_taken_seconds), label[t.game_status] || t.game_status]
+        .forEach((v, i) => {
+          const td = document.createElement("td"); td.textContent = v;
+          if(i === 2) td.className = "score";
+          tr.appendChild(td);
+        });
+      body.appendChild(tr);
+    });
+    document.getElementById("upd").textContent = "Updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    document.getElementById("upd").textContent = "Connection lost. Retrying...";
+  }
+}
+load(); setInterval(load, 5000);
+</script>
+</body>
+</html>
