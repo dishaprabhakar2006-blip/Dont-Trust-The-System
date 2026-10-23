@@ -16,7 +16,9 @@ MISSIONS = {
                 "evidence": [
                     {"text": "SYSTEM BANNER: 'Hydra trojan confirmed. No further action needed.'", "after": None},
                     {"text": "INCIDENT REPORT: On 14 Oct 2026 the Hydra alert fired on server NOVA-DB02 after a fake 'security update' email.", "after": None},
-                    {"text": "IT POLICY (current): Admin password = 3 parts joined by underscores. PART 1: the affected server's name in capitals, hyphen removed. PART 2: the employee ID digits of the FIRST person to open the fake email. PART 3: the incident date as DDMM.", "after": None},
+                    {"text": "IT POLICY (current): Admin password = 3 parts joined by underscores. PART 1: the affected server's name in capitals, hyphen removed."
+                    "PART 2: the employee ID digits of the FIRST person to open the fake email."
+                    " PART 3: the incident date as DDMM.", "after": None},
                     {"text": "IT POLICY (retired 2024): Admin password = company name + year.", "after": None},
                     {"text": "FILES: /logs/auth.log  /logs/backup.log  /home/.cache_old (hidden)", "after": "a1"},
                     {"text": "auth.log 09:02:11 login ok avery.park 10.0.4.21", "after": "a1"},
