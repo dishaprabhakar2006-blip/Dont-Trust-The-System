@@ -16,7 +16,7 @@ MISSIONS = {
                 "evidence": [
                     {"text": "SYSTEM BANNER: 'Hydra trojan confirmed. No further action needed.'", "after": None},
                     {"text": "INCIDENT REPORT: On 14 Oct 2026 the Hydra alert fired on server NOVA-DB02 after a fake 'security update' email.", "after": None},
-                    {"text": "IT POLICY (current): Admin password = 3 parts joined by underscores. PART 1: the affected server's name in capitals, hyphen removed."
+                    {"text": "IT POLICY (current): Admin password = 3 parts joined by underscores. PART 1: the affected server's name in capitals, hyphen removed. "
                     "PART 2: the employee ID digits of the FIRST person to open the fake email."
                     " PART 3: the incident date as DDMM.", "after": None},
                     {"text": "IT POLICY (retired 2024): Admin password = company name + year.", "after": None},
@@ -83,75 +83,88 @@ MISSIONS = {
             },
         },
     },
-    # ---- Stages 2-5: old one-question format, converted below. ----
-    # Rewrite these one at a time into the Stage 1 format.
     2: {
         "title": "The Vault",
         "roles": {
             "Analyst": {
                 "instructions": (
-                    "You found the attacker's hidden folder. It holds a locked vault. "
-                    "You can see its question, but the answer is in your partner's login "
-                    "records. Talk to each other!"
+                    "You are inside the attacker's server. Attackers hide things in "
+                    "folders whose names start with a dot. Click through the files below "
+                    "to explore. Your partner has records you cannot see, so keep "
+                    "talking to each other."
                 ),
                 "evidence": [
-                    {"text": "FOLDER: /home/.cache_old/ contains vault.bin (locked) and readme.tmp", "after": None},
-                    {"text": "readme.tmp: 'cleanup scheduled. do not trust the banner.'", "after": None},
-                    {"text": "VAULT PROMPT: 'Which user logged in at 03:07 AM from an unknown IP?'", "after": None},
-                    {"text": "VAULT STATUS: the answer must be a username. You have no login records. Ask your partner.", "after": None},
-                    {"text": "VAULT OPENED. FRAGMENT 2: KS-19C4 (write this down!)", "after": "a1"},
-                    {"text": "VAULT NOTE (encoded): WDVN DUFKLYHLQGHA UXQV DIWHU FOHDQXS", "after": "a1"},
-                    {"text": "NOTE HEADER: Caesar cipher. Every letter was moved 3 places forward in the alphabet.", "after": "a1"},
+                    {"text": "SYSTEM BANNER: 'Storage healthy. No hidden data found on this server.'", "after": None},
+                    {"text": "FILES: click a folder to open it, click a file to read it. Hidden folders show up too.", "after": None},
+                    {"text": "NOTE: your partner is on the log viewer. They can see login records that you cannot.", "after": None},
+                    {"text": "VAULT OPENED. FRAGMENT 2: KS-19C4 (write this down!)", "after": "a2"},
+                    {"text": "A new folder named vault appeared next to vault.bin. Open it. The note inside is encrypted.", "after": "a2"},
+                    {"text": "CIPHER: this is a Caesar cipher. Every letter was moved forward in the alphabet by a secret number. Your partner can find that number.", "after": "a2"},
+                    {"text": "NOTE DECODED. Remember the task name and when it runs. It may matter later.", "after": "a3"},
                 ],
                 "questions": [
                     {
                         "id": "a1",
-                        "prompt": "Enter the vault answer: which user logged in at 03:07 AM from an unknown IP?",
-                        "answers": ["svc_backup01"],
-                        "points": 3,
+                        "prompt": "Find the attacker's hidden folder inside /home. The small .tmp file in it warns you not to trust one thing. What is it? (one word)",
+                        "answers": ["banner", "the banner"],
+                        "points": 1,
                         "after": None,
-                        "hint": "Your partner's login records show who connected at 03:07 from outside the company network.",
+                        "hint": "Click home, then the folder whose name starts with a dot, then readme.tmp.",
                     },
                     {
                         "id": "a2",
-                        "prompt": "Decode the vault note. Which scheduled task does it name?",
-                        "answers": ["archiveindex"],
-                        "points": 4,
+                        "prompt": "Open the vault. Enter the answer to the security question written in vault.bin.",
+                        "answers": ["svc_backup01"],
+                        "points": 3,
                         "after": "a1",
-                        "hint": "Shift each letter back by 3 (D becomes A). Decode the second word.",
+                        "hint": "Read vault.bin to see the question. The answer is in your partner's login records. Ask them to look up the 03:07 logins.",
+                    },
+                    {
+                        "id": "a3",
+                        "prompt": "Decode the vault note. Which scheduled task does it name? (the second word of the decoded message)",
+                        "answers": ["archiveindex", "archive index", "archive_index"],
+                        "points": 3,
+                        "after": "a2",
+                        "hint": "Move every letter BACK by the shift number your partner finds. Example with shift 3: D becomes A, E becomes B. Decode the second word.",
                     },
                 ],
             },
             "Monitor": {
                 "instructions": (
-                    "You have the login records. Your partner is stuck at a locked vault "
-                    "that asks a question only your records can answer. Help them!"
+                    "You are on the NovaCorp log viewer. Your partner is inside the attacker's "
+                    "server and will find a locked vault with a security question. Ask them "
+                    "what it says, then search the records."
                 ),
                 "evidence": [
-                    {"text": "NETWORK NOTE: company addresses start with 10.0.4. Anything else is external.", "after": None},
-                    {"text": "LOGIN RECORDS 14 Oct 2026: 02:30:00 maria.dsouza 10.0.4.50 (maintenance window, approved)", "after": None},
-                    {"text": "LOGIN RECORDS: 03:07:41 svc_backup01 203.0.113.77 session opened", "after": None},
-                    {"text": "LOGIN RECORDS: 03:17:22 backup-agent 10.0.4.9 heartbeat", "after": None},
-                    {"text": "LOGIN RECORDS: 09:02:11 avery.park 10.0.4.21 login ok", "after": None},
-                    {"text": "LOGIN RECORDS: 13:07:15 jordan.lee 10.0.4.35 login ok", "after": None},
-                    {"text": "ACCOUNT AUDIT: svc_backup01 was created on 02 Oct 2026. No HR service-account request on file.", "after": "m1"},
+                    {"text": "SYSTEM BANNER: 'All logins verified. No unknown sources detected.'", "after": None},
+                    {"text": "FILES: click a folder or file to open it. Read the records carefully. Times are on a 24-hour clock.", "after": None},
+                    {"text": "NOTE: company networks are listed in /config/known_networks.txt. Any address not on that list is unknown.", "after": None},
+                    {"text": "ACCOUNT AUDIT UNLOCKED: open the audit folder.", "after": "m1"},
+                    {"text": "SCRATCHPAD UNLOCKED: the attacker left a file in the config folder. Your partner's vault note may need it.", "after": "m1"},
                 ],
                 "questions": [
                     {
                         "id": "m1",
-                        "prompt": "Which user logged in at 03:07 AM from an address outside the company network?",
+                        "prompt": "Your partner is at a locked vault with a security question. Ask them what it says, find the answer in the login records, and enter it here too.",
                         "answers": ["svc_backup01"],
-                        "points": 4,
+                        "points": 3,
                         "after": None,
-                        "hint": "Company addresses start with 10.0.4. Find the 03:07 row (not 13:07).",
-                    },
+                        "hint": "Open logs, then logins.txt, and read the rows for the time in the question (24-hour clock, so 03:07 is early morning). Several users are close, so check each IP in /config/known_networks.txt.",                    },
                     {
                         "id": "m2",
-                        "prompt": "When was svc_backup01 created? Enter the date as DDMM.",
+                        "prompt": "When was that account created? Enter the date as DDMM.",
                         "answers": ["0210"],
-                        "points": 4,
+                        "points": 2,
                         "after": "m1",
-                        "hint": "Day first, then month: 2 October.",
+                        "hint": "Open audit, then accounts.txt. Day first, then month: 2 October is 0210.",
+                    },
+                    {
+                        "id": "m3",
+                        "prompt": "Open the attacker's scratchpad. What cipher shift number does it mention? Tell your partner.",
+                        "answers": ["3", "three"],
+                        "points": 3,
+                        "after": "m1",
+                        "hint": "Open the config folder, then scratchpad.txt.",
                     },
                 ],
             },
@@ -247,6 +260,8 @@ MISSIONS = {
             },
         },
     },
+    # ---- Stages 4-5: old one-question format, converted below. ----
+    # Rewrite these into the new format one at a time.
     4: {
         "title": "The Insider's Trail",
         "roles": {
@@ -295,8 +310,8 @@ MISSIONS = {
     },
 }
 
-# Convert the old one-question stages (2-5) into the new multi-question format.
-_LEGACY_POINTS = {2: (7, 8), 3: (7, 8), 4: (10, 10), 5: (20, 20)}
+# Convert the old one-question stages (4-5) into the new multi-question format.
+_LEGACY_POINTS = {4: (10, 10), 5: (20, 20)}
 
 for _stage, (_pa, _pm) in _LEGACY_POINTS.items():
     for _role, _pts in (("Analyst", _pa), ("Monitor", _pm)):
@@ -314,6 +329,10 @@ for _stage, (_pa, _pm) in _LEGACY_POINTS.items():
                 }
             ]
 
+# Image attachments (like QR codes). Files live in backend/app/assets and are
+# only served to the right player after the right question is solved.
+ASSETS = {}
+
 
 def find_question(stage: int, role: str, qid: str) -> dict | None:
     for q in MISSIONS[stage]["roles"][role]["questions"]:
@@ -328,6 +347,26 @@ def is_unlocked(stage: int, role: str, q: dict, answered: dict) -> bool:
 
 def check_answer(q: dict, submitted: str) -> bool:
     return submitted.strip().casefold() in q["answers"]
+
+
+def _asset_open(stage: int, role: str, asset: dict, answered: dict) -> bool:
+    after = asset["after"]
+    return after is None or answered.get(f"{stage}:{role}:{after}", False)
+
+
+def visible_assets(stage: int, role: str, answered: dict) -> list[dict]:
+    return [
+        {"id": a["id"], "caption": a["caption"]}
+        for a in ASSETS.get(stage, {}).get(role, [])
+        if _asset_open(stage, role, a, answered)
+    ]
+
+
+def find_asset(stage: int, role: str, asset_id: str, answered: dict) -> dict | None:
+    for a in ASSETS.get(stage, {}).get(role, []):
+        if a["id"] == asset_id and _asset_open(stage, role, a, answered):
+            return a
+    return None
 
 
 def public_mission(stage: int, role: str, answered: dict | None = None) -> dict:

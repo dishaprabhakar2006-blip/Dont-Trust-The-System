@@ -1,11 +1,14 @@
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 import math
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from backend.app.repository import TeamRepository, create_repository_from_env
@@ -15,8 +18,11 @@ from backend.app.missions import (
     find_question,
     is_unlocked,
     check_answer,
+    visible_assets,
+    find_asset,
 )
 from backend.app.models import Player, Team
+from backend.app.terminal import run_command, has_terminal
 
 
 # --------------------------------------------------
@@ -46,6 +52,12 @@ class HintInput(BaseModel):
     question_id: str = Field(min_length=1, max_length=20)
 
 
+class TerminalInput(BaseModel):
+    player_id: str = Field(min_length=1)
+    command: str = Field(min_length=1, max_length=200)
+    cwd: str = Field(default="/", max_length=200)
+
+
 # --------------------------------------------------
 # Game configuration
 # --------------------------------------------------
@@ -59,6 +71,14 @@ TOTAL_STAGES = 5
 MAX_WRONG_BEFORE_LOCK = 5
 LOCK_SECONDS = 30
 HINT_COST = 1
+
+# TESTING ONLY: START_STAGE=2 in .env makes new teams start at stage 2.
+# Remove this line from .env before the event!
+START_STAGE = min(max(1, int(os.getenv("START_STAGE", "1"))), TOTAL_STAGES)
+if START_STAGE != 1:
+    print(f"WARNING: START_STAGE={START_STAGE}. New teams skip ahead. Remove before the event!")
+
+ASSET_DIR = Path(__file__).parent / "assets"
 
 _join_code_alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -174,9 +194,9 @@ configure_cors(app)
 # Health endpoints
 # --------------------------------------------------
 
-@app.get("/")
-def read_root() -> dict[str, str]:
-    return {"message": "Welcome to the Don't Trust the System API"}
+@app.get("/", include_in_schema=False)
+def read_root():
+    return RedirectResponse("/play/")
 
 
 @app.get("/health")
@@ -208,6 +228,7 @@ def create_team(payload: CreateTeamInput) -> dict:
                 role="Analyst",
             )
         ],
+        current_stage=START_STAGE,
         duration_seconds=GAME_DURATION_SECONDS,
         created_at=now,
         updated_at=now,
@@ -299,6 +320,8 @@ def get_mission(team_id: str, player_id: str) -> dict:
 
     return {
         **public_mission(team.current_stage, player.role, team.answered),
+        "terminal": has_terminal(team.current_stage, player.role),
+        "assets": visible_assets(team.current_stage, player.role, team.answered),
         **_timer_values(team, utc_now()),
     }
 
@@ -471,6 +494,44 @@ def get_hint(team_id: str, payload: HintInput) -> dict:
 
 
 # --------------------------------------------------
+# Fake terminal and image attachments
+# --------------------------------------------------
+
+@app.post("/teams/{team_id}/terminal")
+def run_terminal(team_id: str, payload: TerminalInput) -> dict:
+    """Run a read-only fake terminal command for the player's current stage."""
+    team = _refresh_team_timer(team_id)
+    _, player = _team_and_player(team_id, payload.player_id)
+
+    if team.game_status != "in_progress":
+        raise HTTPException(status_code=409, detail="The game is not in progress")
+
+    output, cwd, prompt = run_command(
+        team.current_stage, player.role, team.answered, payload.command, payload.cwd
+    )
+    return {"output": output, "cwd": cwd, "prompt": prompt}
+
+
+@app.get("/teams/{team_id}/asset/{asset_id}")
+def get_asset(team_id: str, asset_id: str, player_id: str):
+    """Serve an attachment (like a QR code) only once it is unlocked."""
+    team, player = _team_and_player(team_id, player_id)
+
+    if team.game_status != "in_progress":
+        raise HTTPException(status_code=409, detail="The game is not in progress")
+
+    asset = find_asset(team.current_stage, player.role, asset_id, team.answered)
+    path = ASSET_DIR / asset["file"] if asset else None
+
+    if asset is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment not available")
+
+    return FileResponse(
+        path, media_type="image/png", headers={"Cache-Control": "no-store"}
+    )
+
+
+# --------------------------------------------------
 # Team results
 # --------------------------------------------------
 
@@ -520,11 +581,13 @@ def get_leaderboard() -> list[dict]:
 
     return [{"rank": index, **row} for index, row in enumerate(rows, start=1)]
 
-from pathlib import Path
-from fastapi.staticfiles import StaticFiles
+
+# --------------------------------------------------
+# Game pages (must stay last)
+# --------------------------------------------------
 
 app.mount(
-       "/play",
-       StaticFiles(directory=Path(__file__).parent / "static", html=True),
-       name="play",
-   )
+    "/play",
+    StaticFiles(directory=Path(__file__).parent / "static", html=True),
+    name="play",
+)

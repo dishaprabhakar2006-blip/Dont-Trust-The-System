@@ -2,6 +2,8 @@ from fastapi.testclient import TestClient
 from datetime import datetime, timedelta, timezone
 from concurrent.futures import ThreadPoolExecutor
 from fastapi import FastAPI
+import pytest
+from pathlib import Path
 
 from backend.app import main
 from backend.app.main import app, configure_cors, parse_frontend_origins
@@ -463,3 +465,108 @@ def test_hint_costs_one_point_once() -> None:
     assert first.json()["hint"]
     assert first.json()["score"] == 1
     assert second.json()["score"] == 1  # asking again is free
+
+# ---------------- Round 2: The Vault (terminal + QR) ----------------
+
+def play_stage(team: dict, stage: int) -> None:
+    """Answer every question of a stage for both players, in order."""
+    players = {p["role"]: p["player_id"] for p in team["players"]}
+    for role in ("Analyst", "Monitor"):
+        for q in MISSIONS[stage]["roles"][role]["questions"]:
+            response = client.post(f"/teams/{team['team_id']}/actions", json={
+                "player_id": players[role],
+                "question_id": q["id"],
+                "answer": q["answers"][0],
+            })
+            assert response.status_code == 200, response.text
+
+
+def _term(team: dict, index: int, command: str, cwd: str = "/") -> dict:
+    return client.post(f"/teams/{team['team_id']}/terminal", json={
+        "player_id": team["players"][index]["player_id"],
+        "command": command,
+        "cwd": cwd,
+    }).json()
+
+
+def _answer(team: dict, index: int, qid: str, answer: str):
+    return client.post(f"/teams/{team['team_id']}/actions", json={
+        "player_id": team["players"][index]["player_id"],
+        "question_id": qid,
+        "answer": answer,
+    })
+
+
+def _mission(team: dict, index: int) -> dict:
+    return client.get(
+        f"/teams/{team['team_id']}/mission",
+        params={"player_id": team["players"][index]["player_id"]},
+    ).json()
+
+
+def test_stage1_has_no_terminal_or_attachments() -> None:
+    team = create_full_team()
+    mission = _mission(team, 0)
+
+    assert mission["terminal"] is False
+    assert mission["assets"] == []
+
+
+def test_stage2_analyst_terminal_flow() -> None:
+    team = create_full_team()
+    play_stage(team, 1)
+
+    assert _mission(team, 0)["stage"] == 2
+    assert _mission(team, 0)["terminal"] is True
+    assert ".cache_old" in _term(team, 0, "ls -a /home")["output"]
+    assert ".cache_old" not in _term(team, 0, "ls /home")["output"]
+    assert "03:07" in _term(team, 0, "cat /home/.cache_old/vault.bin")["output"]
+    assert "No such file" in _term(
+        team, 0, "cat /home/.cache_old/vault/note.enc")["output"]
+
+    assert _answer(team, 0, "a1", "banner").status_code == 200
+    assert _answer(team, 0, "a2", "svc_backup01").status_code == 200
+
+    assert "WDVN" in _term(team, 0, "cat /home/.cache_old/vault/note.enc")["output"]
+    assert "KS-19C4" in _term(team, 0, "cat /home/.cache_old/vault/fragment2.txt")["output"]
+    assert _answer(team, 0, "a3", "ArchiveIndex").status_code == 200
+
+
+def test_stage2_monitor_terminal_search_and_audit_unlock() -> None:
+    team = create_full_team()
+    play_stage(team, 1)
+
+    found = _term(team, 1, "grep 03:07 /logs/logins.txt")["output"]
+    assert "svc_backup01" in found and "contractor.ray" in found
+
+    piped = _term(team, 1, "cat /logs/logins.txt | grep 203.0.113")["output"]
+    assert "svc_backup01" in piped and "avery.park" not in piped
+
+    assert "No such file" in _term(team, 1, "cat /audit/accounts.txt")["output"]
+    assert "No such file" in _term(team, 1, "cat /config/scratchpad.txt")["output"]
+    assert _answer(team, 1, "m1", "svc_backup01").status_code == 200
+    assert "2026-10-02" in _term(team, 1, "cat /audit/accounts.txt")["output"]
+    assert "shift is 3" in _term(team, 1, "cat /config/scratchpad.txt")["output"]
+    assert _answer(team, 1, "m2", "0210").status_code == 200
+    assert _answer(team, 1, "m3", "3").status_code == 200
+
+
+def test_stage2_mission_text_does_not_leak_answers() -> None:
+    team = create_full_team()
+    play_stage(team, 1)
+
+    for index in (0, 1):
+        text = str(_mission(team, index)).lower()
+        for secret in ("wdvn", "ks-19c4", "svc_backup01", "archiveindex",
+                       "'answers'", "'hint'"):
+            assert secret not in text
+
+
+def test_terminal_rejects_outsiders() -> None:
+    team = create_full_team()
+    other = create_full_team()
+
+    response = client.post(f"/teams/{team['team_id']}/terminal", json={
+        "player_id": other["players"][0]["player_id"], "command": "ls"})
+
+    assert response.status_code == 403
