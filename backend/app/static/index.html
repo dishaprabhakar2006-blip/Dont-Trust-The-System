@@ -233,6 +233,7 @@
             </details>
           </div>
           <div id="dts4"></div>
+          <div id="dts5"></div>
         </div>
 
         <div>
@@ -264,6 +265,7 @@
   </main>
 </div>
 <script src="stage4_ui.js"></script>
+<script src="stage5_ui.js"></script>
 <script>
 let S = JSON.parse(sessionStorage.getItem("dts_session") || "null");
 let hints = {}, lastKey = "", remaining = null, curStage = 0, pollTimer = null;
@@ -279,6 +281,8 @@ function flash(text){
   setTimeout(() => f.style.display = "none", 3500);
 }
 function leave(){
+  window.finished = false;
+  window.s5 = null;
   ["dts_session","dts_notes","dts_intro","dts_seen"].forEach(k => sessionStorage.removeItem(k));
   S = null; hints = {}; lastKey = ""; remaining = null; term.stage = 0; clearInterval(pollTimer);
   $("stats").classList.add("hidden"); $("notes").value = ""; show("start");
@@ -355,6 +359,11 @@ async function poll(){
   try{
     const st = await api(`/teams/${S.team_id}/state`);
     window.flags = st.flags || [];
+    window.s5 = {
+  left: st.countdown_seconds,
+  total: st.countdown_total,
+  at: Date.now()
+  };
     $("stats").classList.remove("hidden");
     $("sRole").textContent = S.role; $("sScore").textContent = st.score;
     remaining = st.remaining_seconds; updateTimer();
@@ -374,8 +383,21 @@ function showWaiting(){
   $("wText").textContent = S.role === "Analyst" ? "Give this code to your partner. The game starts when they join." : "Waiting for the game to start.";
 }
 function showDone(st){
-  clearInterval(pollTimer); show("done");
-  $("dTitle").textContent = st.game_status === "completed" ? "Investigation complete" : "Time is up";
+  clearInterval(pollTimer);
+  window.finished = true;
+  show("done");
+
+  if (st.outcome === "data_lost") {
+    $("dTitle").textContent = "DATA LOST";
+  } else if (st.outcome === "partial") {
+    $("dTitle").textContent = "PARTIAL SUCCESS";
+  } else if (st.outcome === "full") {
+    $("dTitle").textContent = "SYSTEM SECURED";
+  } else {
+    $("dTitle").textContent =
+      st.game_status === "completed" ? "Investigation complete" : "Time is up";
+  }
+
   $("dScore").textContent = st.score;
 }
 
@@ -562,6 +584,9 @@ function maybeCleared(m){
   $("clearNext").textContent = "NEXT: ROUND " + m.stage + " - " + m.title;
   $("clearBtn").textContent = "Enter Round " + m.stage;
 
+  if (seen === 4 && window.DTS5 && typeof window.DTS5.reveal === "function") {
+  window.DTS5.reveal();
+  }
   if(seen === 4){
     $("clearTag").textContent = "// KILL-SWITCH EXECUTED //";
     $("clearTitle").textContent = "SYSTEM SECURED";
@@ -607,6 +632,10 @@ function renderMission(m){
 
   renderAssets(m);
   DTS4.render(m);
+
+  if (window.DTS5 && typeof window.DTS5.render === "function") {
+  window.DTS5.render(m);
+}
 
   const box = $("questions");
   box.innerHTML = "";
@@ -725,9 +754,22 @@ async function submit(qid, forced){
 }
 
 function updateTimer(){
-  if(remaining === null){ $("sTime").textContent = "--:--"; return; }
-  const m = Math.floor(remaining / 60), s = remaining % 60;
-  $("sTime").textContent = String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  if (window.finished) {
+    $("sTime").textContent = "DONE";
+    return;
+  }
+
+  if (remaining === null) {
+    $("sTime").textContent = "--:--";
+    return;
+  }
+
+  const m = Math.floor(remaining / 60);
+  const s = remaining % 60;
+
+  $("sTime").textContent =
+    String(m).padStart(2, "0") + ":" +
+    String(s).padStart(2, "0");
 }
 
 setInterval(() => {

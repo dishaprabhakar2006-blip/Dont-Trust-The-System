@@ -71,6 +71,9 @@ TOTAL_STAGES = 5
 MAX_WRONG_BEFORE_LOCK = 5
 LOCK_SECONDS = 30
 HINT_COST = 1
+STAGE5_SECONDS = int(os.getenv("STAGE5_SECONDS", "480"))
+STAGE5_DELETED_SECONDS = 360
+DATA_LOST_PENALTY = 5
 
 # TESTING ONLY: START_STAGE=2 in .env makes new teams start at stage 2.
 # Remove this line from .env before the event!
@@ -110,8 +113,20 @@ def _timer_values(team: Team, now: datetime) -> dict:
     }
 
 
+def _stage5_total(team: Team) -> int:
+    return STAGE5_DELETED_SECONDS if "3:deleted" in team.flags else STAGE5_SECONDS
+
+
+def _stage5_values(team: Team, now: datetime) -> dict:
+    if team.current_stage != TOTAL_STAGES or team.stage_started_at is None:
+        return {"countdown_seconds": None, "countdown_total": None}
+    total = _stage5_total(team)
+    end = team.stage_started_at + timedelta(seconds=total)
+    return {"countdown_seconds": max(0, math.ceil((end - now).total_seconds())),
+               "countdown_total": total}
+
 def _state_response(team: Team) -> dict:
-    return {**team.model_dump(), **_timer_values(team, utc_now())}
+    return {**team.model_dump(), **_timer_values(team, utc_now()), **_stage5_values(team, utc_now())}
 
 
 def _refresh_team_timer(team_id: str) -> Team:
@@ -119,6 +134,17 @@ def _refresh_team_timer(team_id: str) -> Team:
 
     def expire_if_needed(team: Team) -> None:
         now = utc_now()
+        if (team.current_stage == TOTAL_STAGES and team.game_status == "in_progress"
+                   and team.started_at is not None):
+            if team.stage_started_at is None:
+                   team.stage_started_at = now
+            elif now >= team.stage_started_at + timedelta(seconds=_stage5_total(team)):
+                   team.game_status = "completed"
+                   team.outcome = "data_lost"
+                   team.score = max(0, team.score - DATA_LOST_PENALTY)
+                   team.completed_at = now
+                   team.updated_at = now
+
 
         # Support older records that use "ready".
         if (
@@ -340,6 +366,8 @@ def _stage_done(team: Team, stage: int) -> bool:
 
 @app.post("/teams/{team_id}/actions")
 def submit_action(team_id: str, payload: ActionInput) -> dict:
+    _refresh_team_timer(team_id)
+    
     """Validate an answer, award points, and advance the team."""
     # Errors for wrong/locked/expired are raised AFTER the update, because
     # raising inside the updater would throw away the saved attempt counts.
@@ -421,11 +449,11 @@ def submit_action(team_id: str, payload: ActionInput) -> dict:
             if stage >= TOTAL_STAGES:
                 team.game_status = "completed"
                 team.completed_at = now
+                team.outcome = "partial" if "5:insider_wrong" in team.flags else "full"
             else:
                 team.current_stage += 1
 
         team.updated_at = now
-
     updated = repository.update(team_id, apply)
 
     if updated is None:

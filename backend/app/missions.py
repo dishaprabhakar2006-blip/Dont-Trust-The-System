@@ -6,6 +6,7 @@ only through the /hint endpoint. All answers must be lowercase.
 
 from backend.app.stage3 import MISSION as STAGE3_MISSION
 from backend.app.stage4 import MISSION as STAGE4_MISSION, ASSETS as STAGE4_ASSETS
+from backend.app.stage5 import MISSION as STAGE5_MISSION
 
 MISSIONS = {
     1: {
@@ -201,7 +202,7 @@ MISSIONS = {
         },
     },
 }
-
+MISSIONS[5] = STAGE5_MISSION
 # Convert the old one-question stages (4-5) into the new multi-question format.
 _LEGACY_POINTS = {5: (20, 20)}
 for _stage, (_pa, _pm) in _LEGACY_POINTS.items():

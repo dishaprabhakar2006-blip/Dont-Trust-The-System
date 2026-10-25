@@ -279,8 +279,7 @@ def test_all_five_stages_produce_final_results_and_reject_more_actions() -> None
                 response = client.post(action_url, json={
                     "player_id": players[role],
                     "question_id": q["id"],
-                    "answer": q["answers"][0],
-                })
+                    "answer": "jordan.lee" if (stage == 5 and q["id"] in ("a3", "m2")) else q["answers"][0],                })
                 assert response.status_code == 200
 
     result = client.get(f"/teams/{team['team_id']}/results")
