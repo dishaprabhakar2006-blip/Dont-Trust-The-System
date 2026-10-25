@@ -201,6 +201,7 @@
     </section>
 
     <section id="game" class="hidden">
+      <div id="dts5" class="hidden"></div>
       <div class="grid">
         <div class="card">
           <h2 id="mTitle"></h2>
@@ -233,7 +234,6 @@
             </details>
           </div>
           <div id="dts4"></div>
-          <div id="dts5"></div>
         </div>
 
         <div>
@@ -584,9 +584,6 @@ function maybeCleared(m){
   $("clearNext").textContent = "NEXT: ROUND " + m.stage + " - " + m.title;
   $("clearBtn").textContent = "Enter Round " + m.stage;
 
-  if (seen === 4 && window.DTS5 && typeof window.DTS5.reveal === "function") {
-  window.DTS5.reveal();
-  }
   if(seen === 4){
     $("clearTag").textContent = "// KILL-SWITCH EXECUTED //";
     $("clearTitle").textContent = "SYSTEM SECURED";
@@ -597,8 +594,9 @@ function maybeCleared(m){
   }
 
   $("clearBtn").onclick = () => {
-    sessionStorage.setItem("dts_seen", String(m.stage));
-    $("clear").classList.add("hidden");
+       sessionStorage.setItem("dts_seen", String(m.stage));
+       $("clear").classList.add("hidden");
+       if(seen === 4 && window.DTS5) window.DTS5.reveal();
   };
 
   $("clear").classList.remove("hidden");

@@ -91,8 +91,8 @@ _LEAVE = [
     ("avery.park", "EMP-4471", "Finance", "none"),
     ("jordan.lee", "EMP-5120", "IT Support", "13 to 17 Oct"),
     ("maria.dsouza", "EMP-3308", "Operations", "none"),
-    ("ben.carter", "EMP-3871", "HR", "none"),
-    ("priya.nair", "EMP-2290", "Admin", "20 to 24 Oct"),
+    ("ben.carter", "EMP-3871", "HR","12 to 16 Oct"),
+    ("priya.nair", "EMP-2290", "Admin", "14 to 15 Oct"),
     ("contractor.ray", "EXT-0042", "Contractor", "n/a"),
 ]
 
@@ -104,9 +104,9 @@ _LOGINS = [
     ("08:41", "avery.park", "10.0.4.21", "login ok"),
     ("09:12", "avery.park", "10.0.4.21", "opened Hydra email"),
     ("09:31", "jordan.lee", "10.0.4.35", "opened Hydra email"),
-    ("11:12", "ben.carter", "10.0.4.40", "login ok"),
+    ("11:12", "maria.dsouza", "10.0.4.50", "login ok"),
     ("13:07", "jordan.lee", "10.0.4.35", "login ok"),
-    ("14:20", "priya.nair", "10.0.4.44", "login ok"),
+    ("14:20", "avery.park", "10.0.4.21", "login ok"),
 ]
 _SPIKY = ["▁▁▁█▁▁▁█▁▁▁█", "▂▅▁▇▃▂▆▁▄▂▁▅", "▁▇▁▁▆▁▁▇▁▁▅▁", "▃▂▄▃▅▂▃▄▂▃▂▄", "▂▃▂▅▃▂▄▃▂▃▅▃"]
 _FLAT = "▃▃▃▃▃▃▃▃▃▃▃▃"
@@ -166,8 +166,8 @@ MISSION = {
             ],
             "tables": [
                 _table("acc", "Accounts (NOVA-DB02)",
-                       ["User", "Type", "Created", "HR request", "Last login"],
-                       [_row(u, [u, t, c, h, l], "account_disabled" if u == "svc_backup01" else None)
+                       ["User", "Type", "Created", "HR request", "Status"],
+                       [_row(u, [u, t, c, h, "active"], "account_disabled" if u == "svc_backup01" else None)
                         for u, t, c, h, l in _ACCOUNTS],
                        {"question": "a1", "label": "Disable",
                         "confirm": "Disable this account? A wrong choice counts as a wrong answer."}),
@@ -191,8 +191,7 @@ MISSION = {
                  "prompt": "Disable the task that runs after cleanup and belongs to that account.",
                  "pick": True, "effects": {"archiveindex": {"flag": "task_disabled"}},
                  "hint": "Check the Owner and Trigger columns. Beware of names that look alike."},
-                _insider("Name the insider. Right name earns 6 points, a wrong name earns 3.", 6, "a3"),
-            ],
+                _insider("Name the insider. RULE: the insider is the employee who was on approved leave on 14 Oct (the incident date) but still logged in that day. Right name earns 6 points, a wrong name earns 3.", 6, "a3"),            ],
         },
         "Monitor": {
             "instructions": (
@@ -222,8 +221,7 @@ MISSION = {
                  "pick": True, "effects": {"n8443": {"flag": "ip_blocked"}},
                  "hint": "Ignore the spikes. Look for an outside address with a perfectly flat "
                          "line, a large total and a start time in the early morning."},
-                _insider("Name the insider. Right name earns 10 points, a wrong name earns 5.", 10, "m2"),
-            ],
+                _insider("Name the insider. RULE: the insider is the employee who was on approved leave on 14 Oct (the incident date) but still logged in that day. Right name earns 10 points, a wrong name earns 5.", 10, "m2"),            ],
         },
     },
 }

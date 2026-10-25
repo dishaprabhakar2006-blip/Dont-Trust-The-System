@@ -7,6 +7,12 @@
   const $q = id => document.getElementById(id);
   const css = document.createElement("style");
   css.textContent = `
+    #dts5{position:sticky;top:0;z-index:50;background:var(--ink);padding:6px 0 2px}
+    body.s4 main,body.s5on main{max-width:1500px}
+    body.s4 .grid,body.s5on .grid{grid-template-columns:1.8fr 1fr}
+    body.s4 .tbl span,body.s5on .tbl span{white-space:normal;overflow:visible;text-overflow:clip;word-break:break-word}
+    body.s4 .tbl .tr,body.s4 .tbl .th,body.s5on .tbl .tr,body.s5on .tbl .th{font-size:12.5px}
+    body.s5on .tbl{max-height:380px}
     .s5bar{border:1px solid var(--red);border-radius:6px;background:#1a0507;padding:12px 16px;margin-bottom:16px}
     .s5top{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
     .s5top b{color:var(--red);font:700 16px var(--mono);letter-spacing:2px}
@@ -78,6 +84,7 @@
   window.DTS5 = {
     render: function(m){
       const on = m.stage === 5;
+      document.body.classList.toggle("s5on", on);
       $q("dts5").classList.toggle("hidden", !on);
       if(on && !built) build();
       if(!on) document.body.classList.remove("s5panic");

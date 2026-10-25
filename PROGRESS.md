@@ -3,7 +3,41 @@
 Last updated: 25 Oct 2026 (event is Thursday 29 Oct 2026, 4 days left)
 
 > SPOILER WARNING: sections 6 and 9 contain every answer and the story solution. Keep this repo PRIVATE (GitHub, Settings, Danger Zone, Change visibility). After making it private, check that Render still deploys (reconnect the repo in Render settings if it stops).
+## 0. LATEST STATUS (25 Oct 2026, night). Paste this ABOVE section 1.
 
+**Built and playable: Rounds 1 to 5.** `python -m pytest backend/tests -q` gives 50 passed (needs `backend/tests/conftest.py` that sets START_STAGE=1).
+
+### Round 5 "The Crisis" (new)
+- Files: `backend/app/stage5.py`, `backend/app/static/stage5_ui.js`, `backend/tests/test_stage5.py`.
+- Edits: `models.py` (stage_started_at, outcome), `main.py` (_stage5_total, _stage5_values, countdown and data-lost in _refresh_team_timer, outcome on completion, _refresh_team_timer called first in submit_action), `missions.py` (`MISSIONS[5] = STAGE5_MISSION`), `index.html` (`<div id="dts5" class="hidden">` ABOVE `<div class="grid">`, script tag, window.s5 in poll, DTS5.render, showDone outcomes, DONE timer).
+- The glitch reveal (DTS5.reveal) must run when the player CLICKS "Close the case" on the fake SYSTEM SECURED screen, inside clearBtn.onclick. Not when that screen appears.
+- Countdown: 8 min (STAGE5_SECONDS=480), 6 min if flag 3:deleted. Server-side, starts when the team first enters stage 5.
+- Scoring: 40 points (Analyst 20: a1 7, a2 7, a3 6. Monitor 20: m1 10, m2 10). Wrong insider = half points (3 and 5), no deduction. Time out = DATA LOST: keep points already earned, minus 5, outcome data_lost. Wrong clicks use normal wrong-answer rules (5 in a row lock 30 s).
+- Answers (SPOILERS): Analyst disables svc_backup01 and ArchiveIndex (not the look-alike ArchiveIndexer), insider jordan.lee. Monitor blocks row n8443 (203.0.113.77, 61 MB, since 03:07, flat line), insider jordan.lee.
+- Insider logic: the rule is printed on screen (on approved leave on 14 Oct but still logged in that day). Analyst's HR table: jordan 13 to 17 Oct, ben 12 to 16, priya 14 to 15. Monitor's 14 Oct login table: only jordan.lee is active while on leave (09:31 opened the Hydra email, 13:07 login).
+- Layout: on stages 4 and 5 the page widens, table cells wrap (full text visible), and the red upload bar and countdown stick to the top.
+
+### Lessons from debugging
+- The tests read `.env`. Never leave START_STAGE in `.env` (also not in Render). conftest.py forces START_STAGE=1.
+- test_all_five_stages must answer jordan.lee for stage 5 questions a3 and m2.
+- Python tuples in `_LOGINS` need commas. A missing one crashes stage5.py at import.
+- Press Ctrl+F5 after changing HTML or JS. Restart the server after changing Python.
+
+### Decisions
+- Keep the 90 minute clock for now. Re-check after timing a senior and friends (105 may be safer).
+- Participant briefing is spoiler-free: take notes, 100 points, 1 point per hint, 5 wrong answers lock 30 s, Round 4 needs a phone, clock starts when both join, last round is timed, no searching, highest score wins and faster team breaks ties.
+
+### Come back to these (in this order)
+1. Save progress to a file, rejoin option for closed tabs, "Start for everyone" button. (Save and rejoin are NOT cuttable.)
+2. QR round: highlight the selected tile, animate swaps and rotation, add a "skip the QR" option (-5 points), make the QR hint cost more.
+3. Wrong-answer and lockout messages shown beside the input, big and red, so nobody has to scroll.
+4. Green congratulation pop-up after every round (including Round 3) and a finale celebration.
+5. Hints on every question (run the no-hint check script).
+6. Round 3 rework (clickable inbox, same-feel problem with Round 2).
+7. Restyle leaderboard.html, rules sheet, seniors guide, clue audit.
+8. Tune Round 5 difficulty after a real playtest (add decoys if too easy).
+9. Make the repo private (check Render still deploys), remove START_STAGE everywhere, dry run in the lab (27th, date to be confirmed).
+10. Promo message is written. Fill in time, venue, fees, prizes, link and contacts.
 ## 1. The event
 - College cybersecurity puzzle game, 29 Oct 2026, in the college lab. About 25-30 teams, ~60 PCs, Chrome on all PCs, ~16 inch screens, internet available.
 - Each team = 2 players on 2 separate PCs (Analyst + Monitor). They sit NEXT TO EACH OTHER, so puzzles should need both players to act, not only hide information.
