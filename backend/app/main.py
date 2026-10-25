@@ -319,9 +319,9 @@ def get_mission(team_id: str, player_id: str) -> dict:
         )
 
     return {
-        **public_mission(team.current_stage, player.role, team.answered),
+        **public_mission(team.current_stage, player.role, team.answered, team.flags),
         "terminal": has_terminal(team.current_stage, player.role),
-        "assets": visible_assets(team.current_stage, player.role, team.answered),
+        "assets": visible_assets(team.current_stage, player.role, team.answered, team.flags),
         **_timer_values(team, utc_now()),
     }
 
@@ -343,8 +343,7 @@ def submit_action(team_id: str, payload: ActionInput) -> dict:
     """Validate an answer, award points, and advance the team."""
     # Errors for wrong/locked/expired are raised AFTER the update, because
     # raising inside the updater would throw away the saved attempt counts.
-    outcome = {"result": None, "wait": 0, "points": 0, "stage": None, "left": 0}
-
+    outcome = {"result": None, "wait": 0, "points": 0, "penalty": 0, "stage": None, "left": 0}
     def apply(team: Team) -> None:
         player = next(
             (p for p in team.players if p.player_id == payload.player_id), None
@@ -404,9 +403,16 @@ def submit_action(team_id: str, payload: ActionInput) -> dict:
             team.updated_at = now
             return
 
+        effect = q.get("effects", {}).get(payload.answer.strip().casefold(), {})
+        gained = effect.get("points", q["points"])
+        penalty = effect.get("penalty", 0)
+
         team.answered[key] = True
-        team.score += q["points"]
-        outcome["points"] = q["points"]
+        team.score = max(0, team.score + gained - penalty)
+        if effect.get("flag"):
+            team.flags.append(f"{stage}:{effect['flag']}")
+        outcome["points"] = gained
+        outcome["penalty"] = penalty
         outcome["result"] = "correct"
         outcome["stage"] = stage
 
@@ -447,6 +453,7 @@ def submit_action(team_id: str, payload: ActionInput) -> dict:
     return {
         "accepted": True,
         "points_awarded": outcome["points"],
+        "penalty": outcome["penalty"],
         "score": updated.score,
         "stage_completed": outcome["stage"] in updated.completed_stages,
         "completed_stages": updated.completed_stages,
@@ -507,7 +514,8 @@ def run_terminal(team_id: str, payload: TerminalInput) -> dict:
         raise HTTPException(status_code=409, detail="The game is not in progress")
 
     output, cwd, prompt = run_command(
-        team.current_stage, player.role, team.answered, payload.command, payload.cwd
+        team.current_stage, player.role, team.answered, team.flags,
+        payload.command, payload.cwd
     )
     return {"output": output, "cwd": cwd, "prompt": prompt}
 
@@ -520,7 +528,7 @@ def get_asset(team_id: str, asset_id: str, player_id: str):
     if team.game_status != "in_progress":
         raise HTTPException(status_code=409, detail="The game is not in progress")
 
-    asset = find_asset(team.current_stage, player.role, asset_id, team.answered)
+    asset = find_asset(team.current_stage, player.role, asset_id, team.answered, team.flags)
     path = ASSET_DIR / asset["file"] if asset else None
 
     if asset is None or not path.is_file():

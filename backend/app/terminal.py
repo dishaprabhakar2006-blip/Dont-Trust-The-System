@@ -8,6 +8,7 @@ have answered that question. Everything is read-only.
 import posixpath
 import re
 import shlex
+from backend.app.stage3 import TERMINAL as STAGE3_TERMINAL
 
 MAX_OUTPUT = 4000
 
@@ -36,7 +37,6 @@ TERMINALS = {
                     "NOVA-DB02 admin console\n"
                     "Logged in as: admin\n"
                     "Attackers hide things. Hidden files and folders start with a dot.\n"
-                    "Type 'help' for commands."
                 ),
                 "/etc/motd": _f("NovaCorp internal system. Authorised use only."),
                 "/var/log/syslog": _f(
@@ -44,14 +44,16 @@ TERMINALS = {
                     "14 Oct 09:14:02 av: Hydra_Update quarantined\n"
                     "14 Oct 09:15:30 cron: cache cleanup skipped"
                 ),
-                "/home/avery.park/todo.txt": _f(
-                    "renew parking permit\nsubmit expense report\nlunch with maria"
-                ),
+                "/home/avery.park/notes.txt": _f("call vendor about invoice 2231.\nsend q3 numbers to finance on friday."),
+                "/home/avery.park/Documents/q3_summary.txt": _f("Q3 summary: revenue up 4 percent.\nNo issues to report."),
+                "/home/avery.park/Documents/expenses.txt": _f("taxi 450\nlunch 320\nprinter paper 780"),
                 "/home/maria.dsouza/maint.txt": _f(
                     "maintenance window 02:30 approved by IT. routine patching."
                 ),
                                 "/home/priya.nair/notes.txt": _f("team lunch friday. book room 4B for the review."),
-                "/home/ben.carter/todo.txt": _f("update rota\norder new badges\nreply to HR"),
+                "/home/ben.carter/notes.txt": _f("check rota for next week.\nask priya about the audit date."),
+                "/home/ben.carter/Documents/rota_draft.txt": _f("Mon: ben, priya\nTue: avery, maria\nWed: ben, avery"),
+                "/home/ben.carter/Documents/policies_old.txt": _f("old visitor policy. replaced in august."),
                 "/home/maria.dsouza/.bash_history": _f("sudo apt update\nsudo apt upgrade\nexit"),
                 "/home/.mozilla_old/cache.tmp": _f("browser cache. nothing useful here."),
                 "/home/.cache_old/readme.tmp": _f(
@@ -87,7 +89,6 @@ TERMINALS = {
                     "NOVA-SIEM log viewer\n"
                     "Logged in as: monitor\n"
                     "Logs are in /logs and settings are in /config.\n"
-                    "Type 'help' for commands."
                 ),
                 "/logs/logins.txt": _f(
                     "\n".join([
@@ -179,14 +180,23 @@ TERMINALS = {
     },
 }
 
+TERMINALS[3] = STAGE3_TERMINAL
+
 def has_terminal(stage: int, role: str) -> bool:
     return role in TERMINALS.get(stage, {})
 
 
-def _open(item: dict, answered: dict, stage: int, role: str) -> bool:
+def _open(item: dict, answered: dict, flags: list, stage: int, role: str) -> bool:
     after = item.get("after")
-    return after is None or bool(answered.get(f"{stage}:{role}:{after}"))
-
+    if after is not None and not answered.get(f"{stage}:{role}:{after}"):
+        return False
+    need = item.get("flag")
+    if need and f"{stage}:{need}" not in flags:
+        return False
+    hide = item.get("unless")
+    if hide and f"{stage}:{hide}" in flags:
+        return False
+    return True
 
 def _abs(cwd: str, path: str) -> str:
     if path.startswith("~"):
@@ -302,19 +312,21 @@ def _pipe_grep(text: str, previous: str) -> str:
     return "\n".join(l for l in previous.splitlines() if word in l.lower())
 
 
-def run_command(stage: int, role: str, answered: dict, command: str, cwd: str):
+def run_command(stage: int, role: str, answered: dict, flags: list, command: str, cwd: str):
     """Return (output, new_cwd, prompt)."""
     term = TERMINALS.get(stage, {}).get(role)
     if term is None:
         return "No terminal on this screen. Use your evidence panel.", "/", "$ "
 
     files = {
-        p: f["text"] for p, f in term["files"].items() if _open(f, answered, stage, role)
+        p: f["text"]
+        for p, f in term["files"].items()
+        if _open(f, answered, flags, stage, role)
     }
     extras = {
         n: c["text"]
         for n, c in term.get("commands", {}).items()
-        if _open(c, answered, stage, role)
+        if _open(c, answered, flags, stage, role)
     }
 
     cwd = _abs("/", cwd or "/")

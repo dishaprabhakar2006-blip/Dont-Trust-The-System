@@ -570,3 +570,229 @@ def test_terminal_rejects_outsiders() -> None:
         "player_id": other["players"][0]["player_id"], "command": "ls"})
 
     assert response.status_code == 403
+
+# ---------------- Round 3: The Curveball ----------------
+
+def _stage3_team() -> dict:
+    team = create_full_team()
+    play_stage(team, 1)
+    play_stage(team, 2)
+    assert _mission(team, 0)["stage"] == 3
+    return team
+
+
+def _state(team: dict) -> dict:
+    return client.get(f"/teams/{team['team_id']}/state").json()
+
+
+def test_stage3_hides_fragment_and_backups_before_the_decision() -> None:
+    team = _stage3_team()
+
+    for index in (0, 1):
+        text = str(_mission(team, index)).lower()
+        for secret in ("ks-7b20", "'answers'", "'hint'", "'effects'"):
+            assert secret not in text
+    assert ".leave_notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
+    assert "No such file" in _term(team, 0, "cat /var/backups/restore.log")["output"]
+    assert "nov4corp.example" in _term(
+        team, 1, "cat /mail/inbox/URGENT_hydra_in_tmp.eml")["output"]
+    assert [q["id"] for q in _mission(team, 1)["questions"]] == ["m1"]
+
+
+def test_stage3_choice_is_locked_until_checks_and_rejects_other_answers() -> None:
+    team = _stage3_team()
+
+    assert _answer(team, 1, "m3", "delete").status_code == 404
+    assert _answer(team, 1, "m1", "nov4corp.example").status_code == 200
+    assert _answer(team, 1, "m2", "03:20").status_code == 200
+    assert _answer(team, 1, "m3", "maybe").status_code == 400
+    assert _state(team)["flags"] == []
+
+
+def test_stage3_keep_path_gives_the_fragment_and_no_penalty() -> None:
+    team = _stage3_team()
+    before = _state(team)["score"]
+
+    assert _answer(team, 1, "m1", "nov4corp.example").status_code == 200
+    assert _answer(team, 1, "m2", "03:20").status_code == 200
+    m3 = [q for q in _mission(team, 1)["questions"] if q["id"] == "m3"][0]
+    assert [c["value"] for c in m3["choices"]] == ["keep", "delete"]
+
+    kept = _answer(team, 1, "m3", "keep")
+    assert kept.status_code == 200
+    assert kept.json()["penalty"] == 0
+    assert "KS-7B20" in str(_mission(team, 1)["evidence"])
+    assert ".leave_notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
+
+    for qid, ans in (("a1", ".leave_notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
+        assert _answer(team, 0, qid, ans).status_code == 200
+    assert _mission(team, 0)["stage"] == 4
+    assert _state(team)["score"] == before + 15
+
+
+def test_stage3_delete_path_costs_points_and_needs_the_backup() -> None:
+    team = _stage3_team()
+    before = _state(team)["score"]
+
+    assert _answer(team, 1, "m1", "nov4corp.example").status_code == 200
+    assert _answer(team, 1, "m2", "03:20").status_code == 200
+    deleted = _answer(team, 1, "m3", "delete")
+    assert deleted.status_code == 200
+    assert deleted.json()["penalty"] == 3
+    assert deleted.json()["points_awarded"] == 0
+    assert "3:deleted" in _state(team)["flags"]
+    assert "KS-7B20" not in str(_mission(team, 1)["evidence"])
+
+    tmp = _term(team, 0, "ls -a /tmp")["output"]
+    assert ".leave_notice.txt" not in tmp
+    assert ".deleted_by_admin.log" in tmp
+    assert ".leave_notice.txt" in _term(
+        team, 0, "ls -a /var/backups/tmp_snapshot")["output"]
+    assert "KS-7B20" in _term(team, 0, "cat /var/backups/restore.log")["output"]
+
+    for qid, ans in (("a1", ".leave_notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
+        assert _answer(team, 0, qid, ans).status_code == 200
+    assert _mission(team, 0)["stage"] == 4
+    # Monitor m1+m2 = 5, delete = 0 and -3, Analyst = 7
+    assert _state(team)["score"] == before + 5 - 3 + 7
+
+# ---------------- Round 4: The Core Dump ----------------
+
+KILL_SWITCH = "KS-A7F3-19C4-7B20-4D91"
+
+
+def _stage4_team() -> dict:
+    team = create_full_team()
+    for stage in (1, 2, 3):
+        play_stage(team, stage)
+    assert _mission(team, 0)["stage"] == 4
+    return team
+
+
+def _rows(team: dict, index: int) -> list:
+    return [r["id"] for r in _mission(team, index)["tables"][0]["rows"]]
+
+
+def _tiles(team: dict, index: int) -> list:
+    return [a["id"] for a in _mission(team, index)["assets"]]
+
+
+def _kill_hydra(team: dict) -> None:
+    assert _answer(team, 1, "m1", "5050").status_code == 200
+    assert _answer(team, 0, "a1", "3188").status_code == 200
+    assert _answer(team, 0, "a2", "p3188").status_code == 200
+
+
+def test_every_question_has_a_hint() -> None:
+    for stage, data in MISSIONS.items():
+        for role, role_data in data["roles"].items():
+            for q in role_data["questions"]:
+                assert q["hint"].strip(), (stage, role, q["id"])
+
+
+def test_stage4_start_screen_hides_clues_and_tiles() -> None:
+    team = _stage4_team()
+
+    for index in (0, 1):
+        mission = _mission(team, index)
+        assert mission["terminal"] is False
+        assert len(mission["tables"]) == 1
+        text = str(mission).lower()
+        for secret in ("ks-4d91", "'answers'", "'hint'", "'effects'", "shadow",
+                       "5-4-8", "2-5-3", "c,a,b,d,e", "53 48 41", "41=a"):
+            assert secret not in text
+        assert _tiles(team, index) == []
+    assert "p3188" in _rows(team, 0)
+    assert "n5050" in _rows(team, 1)
+
+
+def test_stage4_trace_lock_kills_hydra_and_opens_two_tiles() -> None:
+    team = _stage4_team()
+
+    assert _answer(team, 0, "a2", "p3188").status_code == 404   # locked until a1
+    assert _answer(team, 1, "m1", "5051").status_code == 400
+    assert _answer(team, 1, "m1", "5050").status_code == 200
+    assert _answer(team, 0, "a1", "3188").status_code == 200
+    for wrong in ("p3240", "p2466", "p1188"):
+        assert _answer(team, 0, "a2", wrong).status_code == 400
+    assert not any(f.startswith("4:") for f in _state(team)["flags"])
+
+    assert _answer(team, 0, "a2", "p3188").status_code == 200
+    assert "4:hydra_killed" in _state(team)["flags"]
+    assert "p3188" not in _rows(team, 0)
+    assert "n5050" not in _rows(team, 1)
+    assert "n8443" in _rows(team, 1)                 # the steady stream stays
+    assert _tiles(team, 0) == _tiles(team, 1) == ["tile1", "tile2"]
+
+
+def test_stage4_hex_and_dial_locks_open_the_middle_tiles() -> None:
+    team = _stage4_team()
+    _kill_hydra(team)
+
+    assert _answer(team, 0, "a3", "shade").status_code == 400
+    assert _answer(team, 0, "a3", "SHADOW").status_code == 200
+    assert _tiles(team, 1) == ["tile1", "tile2", "tile3"]
+
+    # the dial answers really are the counts from the tables
+    net = [r["cells"] for r in _mission(team, 1)["tables"][0]["rows"]]
+    proc = [r["cells"] for r in _mission(team, 0)["tables"][0]["rows"]]
+    analyst_dial = "{}-{}-{}".format(
+        sum(c[1].startswith("10.0.4.") for c in net),
+        sum(not c[1].startswith("10.0.4.") for c in net),
+        sum(c[4] == "ESTABLISHED" for c in net))
+    monitor_dial = "{}-{}-{}".format(
+        sum(c[3] == "09:14" for c in proc),
+        sum(c[2].startswith("svc_") for c in proc),
+        sum(c[2] == "avery.park" for c in proc))
+    assert (analyst_dial, monitor_dial) == ("5-4-8", "2-5-3")
+
+    assert _answer(team, 0, "a4", "5-4-7").status_code == 400
+    assert _answer(team, 0, "a4", "5-4-8").status_code == 200
+    assert _tiles(team, 1) == ["tile1", "tile2", "tile3"]      # one dial is not enough
+    assert _answer(team, 1, "m3", "c,a,b,d,e").status_code == 404   # needs m2 first
+    assert _answer(team, 1, "m2", "2-5-3").status_code == 200
+    assert _tiles(team, 1) == ["tile1", "tile2", "tile3", "tile4", "tile5"]
+
+
+def test_stage4_order_lock_qr_and_kill_switch_finish_the_stage() -> None:
+    team = _stage4_team()
+    before = _state(team)["score"]
+    _kill_hydra(team)
+    assert _answer(team, 0, "a3", "shadow").status_code == 200
+    assert _answer(team, 0, "a4", "5-4-8").status_code == 200
+    assert _answer(team, 1, "m2", "2-5-3").status_code == 200
+
+    m3 = [q for q in _mission(team, 1)["questions"] if q["id"] == "m3"][0]
+    assert m3["kind"] == "order" and len(m3["cards"]) == 5
+    assert _answer(team, 1, "m3", "a,b,c,d,e").status_code == 400
+    assert _answer(team, 1, "m3", "c,a,b,d,e").status_code == 200
+    assert _tiles(team, 0) == _tiles(team, 1) == [f"tile{n}" for n in range(1, 7)]
+
+    assert _answer(team, 1, "m5", KILL_SWITCH).status_code == 404   # needs m4 first
+    assert _answer(team, 1, "m4", "KS-4D91").status_code == 200
+    assert _answer(team, 1, "m5", "KS-A7F3-19C4-7B20").status_code == 400
+    assert _answer(team, 1, "m5", KILL_SWITCH).status_code == 200
+    assert _answer(team, 0, "a5", KILL_SWITCH.lower()).status_code == 200
+    assert _mission(team, 0)["stage"] == 5
+    assert _state(team)["score"] == before + 20
+
+
+def test_stage4_tiles_are_served_only_when_their_lock_is_open() -> None:
+    team = _stage4_team()
+    other = create_full_team()
+    analyst_id = team["players"][0]["player_id"]
+    monitor_id = team["players"][1]["player_id"]
+
+    def tile(n: int, player_id: str) -> int:
+        return client.get(f"/teams/{team['team_id']}/asset/tile{n}",
+                          params={"player_id": player_id}).status_code
+
+    assert tile(1, monitor_id) == 404
+    _kill_hydra(team)
+    assert tile(4, monitor_id) == 404                     # dials not open yet
+    assert client.get(f"/teams/{team['team_id']}/asset/tile1", params={
+        "player_id": other["players"][0]["player_id"]}).status_code == 403
+
+    if not (Path(main.__file__).parent / "assets" / "stage4_tile1.png").exists():
+        pytest.skip("Run tools/make_qr_tiles.py to create the tile images first")
+    assert tile(1, monitor_id) == tile(1, analyst_id) == 200

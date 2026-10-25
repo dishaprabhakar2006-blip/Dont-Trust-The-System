@@ -25,6 +25,7 @@ class Team(BaseModel):
     wrong_attempts: dict[str, int] = Field(default_factory=dict)
     locked_until: dict[str, datetime] = Field(default_factory=dict)
     hints_used: list[str] = Field(default_factory=list)
+    flags: list[str] = Field(default_factory=list)
     duration_seconds: int = 5400
     started_at: datetime | None = None
     completed_at: datetime | None = None

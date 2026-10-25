@@ -4,6 +4,9 @@ Answers and hints never leave the server except hints, which are released
 only through the /hint endpoint. All answers must be lowercase.
 """
 
+from backend.app.stage3 import MISSION as STAGE3_MISSION
+from backend.app.stage4 import MISSION as STAGE4_MISSION, ASSETS as STAGE4_ASSETS
+
 MISSIONS = {
     1: {
         "title": "Briefing: NovaCorp Is Down",
@@ -170,121 +173,10 @@ MISSIONS = {
             },
         },
     },
-    3: {
-        "title": "The Phish",
-        "roles": {
-            "Analyst": {
-                "instructions": (
-                    "You are in the server's /tmp folder. Your partner has the inbox. "
-                    "Compare notes before you touch anything."
-                ),
-                "evidence": [
-                    {"text": "TERMINAL: ls -la /tmp", "after": None},
-                    {"text": "FILES: .leave_notice.txt  idx_task.cfg  hydra_stub.bin  sess_91ac.tmp  cache_88.tmp", "after": None},
-                    {"text": "hydra_stub.bin: placeholder file, zero network functions. Not a real payload.", "after": None},
-                    {"text": "idx_task.cfg: name=ArchiveIndex trigger=after_cleanup", "after": None},
-                    {"text": "sess_91ac.tmp: (empty)", "after": None},
-                    {"text": "cache_88.tmp: cache rebuilt 08:55 ok", "after": None},
-                    {"text": ".leave_notice.txt: 'HR: employee EMP-5120 is on approved leave from 13 Oct to 17 Oct 2026. Do not contact.'", "after": None},
-                    {"text": "LOG: partner flagged the inbox message. Ask the Monitor for the fragment.", "after": "a2"},
-                ],
-                "questions": [
-                    {
-                        "id": "a1",
-                        "prompt": "Which file in /tmp mentions an employee who should be on leave?",
-                        "answers": [".leave_notice.txt", "leave_notice.txt"],
-                        "points": 2,
-                        "after": None,
-                        "hint": "Look at the file names. One of them is about HR.",
-                    },
-                    {
-                        "id": "a2",
-                        "prompt": "Which employee ID is named in that file? (format EMP-1234)",
-                        "answers": ["emp-5120", "5120"],
-                        "points": 2,
-                        "after": "a1",
-                        "hint": "Read the contents of the leave notice.",
-                    },
-                    {
-                        "id": "a3",
-                        "prompt": "Enter fragment 3. Your partner gets it once they decide what to do with the email.",
-                        "answers": ["ks-7b20"],
-                        "points": 3,
-                        "after": "a2",
-                        "hint": "Ask the Monitor what they decided about the email. The fragment starts with KS-.",
-                    },
-                ],
-            },
-            "Monitor": {
-                "instructions": (
-                    "An urgent email just arrived in your inbox. Your partner is in the "
-                    "server's /tmp folder. Do not act on it until you have checked it."
-                ),
-                "evidence": [
-                    {"text": "INBOX: 1 new URGENT message", "after": None},
-                    {"text": "FROM: it.admin@nov4corp.example   TO: monitor@novacorp.example   SENT: 14 Oct 2026 03:20", "after": None},
-                    {"text": "SUBJECT: URGENT - Hydra is in /tmp. Delete everything there NOW", "after": None},
-                    {"text": "BODY: 'Hydra is running from /tmp. Delete every file in /tmp immediately before it spreads. Tell no one. - IT Sysadmin'", "after": None},
-                    {"text": "STAFF DIRECTORY: the real company domain is novacorp.example", "after": None},
-                    {"text": "TIMELINE: Hydra email first opened 09:12. Hydra alert fired 09:14.", "after": None},
-                    {"text": "ROSTER: EMP-4471 avery.park, EMP-5120 jordan.lee, EMP-3308 maria.dsouza", "after": None},
-                    {"text": "MAIL LOG: jordan.lee (EMP-5120) opened the Hydra email at 09:31 on 14 Oct.", "after": None},
-                    {"text": "EMAIL FLAGGED AS PHISHING. FRAGMENT 3: KS-7B20 (tell your partner!)", "after": "m3"},
-                ],
-                "questions": [
-                    {
-                        "id": "m1",
-                        "prompt": "What fake domain does the email's sender address use?",
-                        "answers": ["nov4corp.example"],
-                        "points": 2,
-                        "after": None,
-                        "hint": "Compare the sender's domain with the real one in the staff directory, letter by letter.",
-                    },
-                    {
-                        "id": "m2",
-                        "prompt": "The Hydra alert fired at 09:14. At what time was this email sent? (HH:MM)",
-                        "answers": ["03:20", "0320"],
-                        "points": 3,
-                        "after": "m1",
-                        "hint": "Check the SENT field. It is hours before the alert.",
-                    },
-                    {
-                        "id": "m3",
-                        "prompt": "Should you delete the files in /tmp as the email asks? Type delete or keep.",
-                        "answers": ["keep"],
-                        "points": 3,
-                        "after": "m2",
-                        "hint": "The email is fake, so the files in /tmp are evidence. Do not destroy evidence.",
-                    },
-                ],
-            },
-        },
-    },
+    3: STAGE3_MISSION,
     # ---- Stages 4-5: old one-question format, converted below. ----
     # Rewrite these into the new format one at a time.
-    4: {
-        "title": "The Insider's Trail",
-        "roles": {
-            "Analyst": {
-                "instructions": "Use the fictional task history to identify the account that created the unusual index task.",
-                "evidence": [
-                    "Training task record: 'ArchiveIndex' created by jordan.lee at 22:11.",
-                    "Task record: the item only indexed fictional case metadata; no files were transferred.",
-                ],
-                "question": "Which account created ArchiveIndex?",
-                "answer_key": "jordan.lee",
-            },
-            "Monitor": {
-                "instructions": "Use the simulated message trail to identify the account associated with the repeated notices.",
-                "evidence": [
-                    "Training mail header: three archive-index notices were requested by jordan.lee.",
-                    "The notices were retained inside the fictional NovaCorp training environment.",
-                ],
-                "question": "Which account is associated with the repeated notices?",
-                "answer_key": "jordan.lee",
-            },
-        },
-    },
+    4: STAGE4_MISSION,
     5: {
         "title": "Close the Investigation",
         "roles": {
@@ -311,8 +203,7 @@ MISSIONS = {
 }
 
 # Convert the old one-question stages (4-5) into the new multi-question format.
-_LEGACY_POINTS = {4: (10, 10), 5: (20, 20)}
-
+_LEGACY_POINTS = {5: (20, 20)}
 for _stage, (_pa, _pm) in _LEGACY_POINTS.items():
     for _role, _pts in (("Analyst", _pa), ("Monitor", _pm)):
         _r = MISSIONS[_stage]["roles"][_role]
@@ -331,8 +222,7 @@ for _stage, (_pa, _pm) in _LEGACY_POINTS.items():
 
 # Image attachments (like QR codes). Files live in backend/app/assets and are
 # only served to the right player after the right question is solved.
-ASSETS = {}
-
+ASSETS = {4: STAGE4_ASSETS}
 
 def find_question(stage: int, role: str, qid: str) -> dict | None:
     for q in MISSIONS[stage]["roles"][role]["questions"]:
@@ -348,50 +238,107 @@ def is_unlocked(stage: int, role: str, q: dict, answered: dict) -> bool:
 def check_answer(q: dict, submitted: str) -> bool:
     return submitted.strip().casefold() in q["answers"]
 
+def _asset_open(stage: int, role: str, asset: dict, answered: dict, flags: list) -> bool:
+    after = asset.get("after")
+    if after is not None and not answered.get(f"{stage}:{role}:{after}", False):
+        return False
+    need = asset.get("flag")
+    if need and f"{stage}:{need}" not in flags:
+        return False
+    for name in asset.get("flags_all") or []:
+        if f"{stage}:{name}" not in flags:
+            return False
+    return True
 
-def _asset_open(stage: int, role: str, asset: dict, answered: dict) -> bool:
-    after = asset["after"]
-    return after is None or answered.get(f"{stage}:{role}:{after}", False)
 
-
-def visible_assets(stage: int, role: str, answered: dict) -> list[dict]:
+def visible_assets(stage: int, role: str, answered: dict, flags: list | None = None) -> list[dict]:
+    flags = flags or []
     return [
         {"id": a["id"], "caption": a["caption"]}
         for a in ASSETS.get(stage, {}).get(role, [])
-        if _asset_open(stage, role, a, answered)
+        if _asset_open(stage, role, a, answered, flags)
     ]
 
 
-def find_asset(stage: int, role: str, asset_id: str, answered: dict) -> dict | None:
+def find_asset(stage: int, role: str, asset_id: str, answered: dict,
+               flags: list | None = None) -> dict | None:
+    flags = flags or []
     for a in ASSETS.get(stage, {}).get(role, []):
-        if a["id"] == asset_id and _asset_open(stage, role, a, answered):
+        if a["id"] == asset_id and _asset_open(stage, role, a, answered, flags):
             return a
     return None
 
 
-def public_mission(stage: int, role: str, answered: dict | None = None) -> dict:
+def _visible(item: dict, stage: int, role: str, answered: dict, flags: list) -> bool:
+    after = item.get("after")
+    if after is not None and not answered.get(f"{stage}:{role}:{after}", False):
+        return False
+    need = item.get("flag")
+    if need and f"{stage}:{need}" not in flags:
+        return False
+    hide = item.get("unless")
+    if hide and f"{stage}:{hide}" in flags:
+        return False
+    return True
+
+
+def _public_tables(r: dict, stage: int, role: str, answered: dict, flags: list) -> list[dict]:
+    tables = []
+    for t in r.get("tables", []):
+        if not _visible(t, stage, role, answered, flags):
+            continue
+        item = {
+            "id": t["id"],
+            "title": t["title"],
+            "columns": t["columns"],
+            "rows": [
+                {"id": row["id"], "cells": row["cells"]}
+                for row in t["rows"]
+                if _visible(row, stage, role, answered, flags)
+            ],
+        }
+        if t.get("pick"):
+            item["pick"] = t["pick"]
+        tables.append(item)
+    return tables
+
+
+def public_mission(stage: int, role: str, answered: dict | None = None,
+                   flags: list | None = None) -> dict:
     """Build the player-facing mission. Never includes answers or hints."""
     answered = answered or {}
+    flags = flags or []
     m = MISSIONS[stage]
     r = m["roles"][role]
+    questions = []
+    for q in r["questions"]:
+        if not is_unlocked(stage, role, q, answered):
+            continue
+        item = {
+            "id": q["id"],
+            "prompt": q["prompt"],
+            "points": q["points"],
+            "answered": answered.get(f"{stage}:{role}:{q['id']}", False),
+        }
+        if q.get("choices"):
+            item["choices"] = q["choices"]
+        if q.get("pick"):
+            item["pick"] = True
+        if q.get("kind"):
+            item["kind"] = q["kind"]
+        if q.get("digits"):
+            item["digits"] = q["digits"]
+        if q.get("cards"):
+            item["cards"] = q["cards"]
+        questions.append(item)
     return {
         "stage": stage,
         "title": m["title"],
         "role": role,
         "instructions": r["instructions"],
         "evidence": [
-            e["text"]
-            for e in r["evidence"]
-            if e["after"] is None or answered.get(f"{stage}:{role}:{e['after']}", False)
+            e["text"] for e in r["evidence"] if _visible(e, stage, role, answered, flags)
         ],
-        "questions": [
-            {
-                "id": q["id"],
-                "prompt": q["prompt"],
-                "points": q["points"],
-                "answered": answered.get(f"{stage}:{role}:{q['id']}", False),
-            }
-            for q in r["questions"]
-            if is_unlocked(stage, role, q, answered)
-        ],
+        "questions": questions,
+        "tables": _public_tables(r, stage, role, answered, flags),
     }
