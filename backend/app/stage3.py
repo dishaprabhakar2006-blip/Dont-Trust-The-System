@@ -48,7 +48,7 @@ MISSION = {
                 {
                     "id": "a1",
                     "prompt": "Which file in /tmp mentions an employee who should be on leave?",
-                    "answers": [".leave_notice.txt", "leave_notice.txt"],
+                    "answers": [".notice.txt", ".notice.txt"],
                     "points": 2,
                     "after": None,
                     "hint": "Open the tmp folder. One file is from HR, and hidden files start with a dot.",
@@ -83,7 +83,7 @@ MISSION = {
                 _e("NEW MAIL: 1 URGENT message. Open the mail folder, then inbox, to read it."),
                 _e("NOTE: the real company email domain is in config/staff_directory.txt. "
                    "Delivery times are in the logs folder."),
-                _e("EMAIL FLAGGED AS PHISHING. FRAGMENT 3: KS-7B20 (tell your partner!)",
+                _e("EMAIL FLAGGED AS PHISHING. FRAGMENT 3: KS-7B20 (make note of it and tell your partner!)",
                    flag="kept"),
                 _e("EVIDENCE DESTROYED: -3 points. The fragment was inside those files. Your "
                    "partner may still recover it from the backup in /var/backups. Help them.",
@@ -109,14 +109,15 @@ MISSION = {
                 },
                 {
                     "id": "m3",
-                    "prompt": "Decide: do what the email says? Deleted files cannot be brought back.",
+                    "prompt": "Decide what to do with the files in /tmp.",
                     "answers": ["keep", "delete"],
                     "points": 3,
                     "after": "m2",
                     "choices": [
-                        {"label": "Keep the files in /tmp", "value": "keep"},
-                        {"label": "Delete everything in /tmp", "value": "delete", "danger": True,
-                         "confirm": "Delete every file in /tmp? This cannot be undone."},
+                        {"label": "Keep the files in /tmp", "value": "keep",
+                         "confirm": "Keep the files in /tmp?"},
+                        {"label": "Delete everything in /tmp", "value": "delete",
+                         "confirm": "Delete everything in /tmp?"},
                     ],
                     "effects": {
                         "keep": {"flag": "kept"},
@@ -135,7 +136,7 @@ MISSION = {
 # ------------------------------------------------------------------
 
 _TMP_FILES = {
-    "/tmp/.leave_notice.txt": (
+    "/tmp/.notice.txt": (
         "HR NOTICE\n"
         "Employee EMP-5120 is on approved leave from 13 Oct to 17 Oct 2026.\n"
         "Do not contact. Access is suspended during leave."

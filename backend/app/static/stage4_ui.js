@@ -4,8 +4,12 @@
 (function(){
   "use strict";
 
+  // Set to true to bring back the "tiles can be upside down" version.
+  const ALLOW_FLIP = false;
+
   const CSS = `
     body.s4 .evidence{max-height:46vh}
+    body.scanning::before,body.scanning::after{display:none}
     .tbl{border:1px solid var(--line);border-radius:4px;background:#0b0e14;max-height:320px;overflow:auto;margin-bottom:12px;scrollbar-color:#3a4155 #0b0e14}
     .tbl::-webkit-scrollbar{width:10px}
     .tbl::-webkit-scrollbar-track{background:#0b0e14}
@@ -17,14 +21,19 @@
     .tbl .tr span,.tbl .th span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .tbl button{padding:3px 10px;font-size:12px;background:#8a1f1f}
     .bd{--m:12px;display:inline-block;margin:6px 0}
-    .bd.scan{--m:18px;background:#fff;padding:24px}
     .bdGrid{display:grid;grid-template-columns:repeat(3,calc(var(--m) * 10))}
     .bdCell{width:calc(var(--m) * 10);height:calc(var(--m) * 15);background:#0b0e14;cursor:pointer;
       display:flex;align-items:center;justify-content:center;font-size:22px}
-    .bdCell.locked{background:#10131a;border:1px dashed var(--line);box-sizing:border-box;cursor:pointer}
+    .bdCell.locked{background:#10131a;border:1px dashed var(--line);box-sizing:border-box}
     .bdCell.sel{outline:3px solid var(--amber);outline-offset:-3px}
     .bdCell img{width:100%;height:100%;display:block;image-rendering:pixelated}
     .bdBar{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .bdSteps{margin:0 0 8px 18px;padding:0;color:var(--dim);font-size:14px}
+    .bdMsg{min-height:20px;margin-top:8px;font-weight:700;color:var(--amber)}
+    .scanOv{position:fixed;inset:0;z-index:90;background:#fff;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:12px;padding:12px}
+    .scanOv .bd{margin:0}
+    .scanOv p{color:#222;margin:0;font-size:16px;text-align:center}
     .dial{display:flex;gap:10px;align-items:center;margin-right:8px}
     .dialCol{display:flex;flex-direction:column;align-items:center;gap:2px}
     .dialCol button{padding:1px 14px;font-size:12px;background:#23304a;color:var(--text)}
@@ -78,7 +87,7 @@
   /* ---------------- QR tile board ---------------- */
   const tileUrl = {};
   const tileBusy = {};
-  let board = null;      // {team, slots, rot, sel, scan}
+  let board = null;      // {team, slots, rot, sel, scan, msg}
   let avail = [];        // tile ids that are unlocked right now
 
   function rng(seed){
@@ -95,8 +104,8 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  function scramble(teamId){
-    const rnd = rng("board:" + teamId);
+  function scramble(seed){
+    const rnd = rng("board:" + seed);
     let slots, rot;
     do{
       slots = [0, 1, 2, 3, 4, 5];
@@ -104,8 +113,8 @@
         const j = Math.floor(rnd() * (i + 1));
         const tmp = slots[i]; slots[i] = slots[j]; slots[j] = tmp;
       }
-      rot = [0, 0, 0, 0, 0, 0].map(() => (rnd() < 0.5 ? 180 : 0));
-    }while(slots.filter((p, i) => p === i).length > 1 || rot.filter(r => r === 180).length < 2);
+      rot = [0, 0, 0, 0, 0, 0].map(() => (ALLOW_FLIP && rnd() < 0.5 ? 180 : 0));
+    }while(slots.filter((p, i) => p === i).length > 1 || (ALLOW_FLIP && rot.filter(r => r === 180).length < 2));
     return {slots, rot};
   }
   function saveBoard(){
@@ -116,7 +125,8 @@
     let st = null;
     try{ st = JSON.parse(sessionStorage.getItem("dts_board_" + team) || "null"); }catch(e){}
     if(!st || !Array.isArray(st.slots) || st.slots.length !== 6 || !Array.isArray(st.rot) || st.rot.length !== 6) st = scramble(team);
-    board = {team, slots: st.slots, rot: st.rot, sel: null, scan: false};
+    if(!ALLOW_FLIP) st.rot = [0, 0, 0, 0, 0, 0];
+    board = {team, slots: st.slots, rot: st.rot, sel: null, scan: false, msg: ""};
   }
   function fetchTile(id){
     const k = teamKey(id);
@@ -128,7 +138,7 @@
       .catch(() => { tileBusy[k] = false; setTimeout(() => { if(avail.indexOf(id) >= 0) fetchTile(id); }, 3000); });
   }
   function clickCell(i){
-    if(board.scan) return;
+    board.msg = "";
     if(board.sel === null){ board.sel = i; }
     else if(board.sel === i){ board.sel = null; }
     else{
@@ -137,52 +147,91 @@
     }
     drawBoard();
   }
+  function checkBoard(){
+    let right = 0, have = 0;
+    board.slots.forEach((piece, i) => {
+      if(avail.indexOf("tile" + (piece + 1)) < 0) return;
+      have++;
+      if(piece === i && (!board.rot[piece])) right++;
+    });
+    board.msg = right === have && have === 6
+      ? "All 6 tiles are in the right place. Press Scan view and scan it with your phone."
+      : right + " of " + have + " unlocked tiles are in the right place.";
+    drawBoard();
+  }
+  function cellFor(piece, i, editable){
+    const id = "tile" + (piece + 1);
+    const url = avail.indexOf(id) >= 0 ? tileUrl[teamKey(id)] : null;
+    const cell = el("div", "bdCell" + (url ? "" : " locked") + (editable && board.sel === i ? " sel" : ""));
+    if(url){
+      const img = el("img");
+      img.src = url; img.alt = ""; img.draggable = false;
+      img.style.transform = board.rot[piece] ? "rotate(180deg)" : "none";
+      cell.appendChild(img);
+    }else{
+      cell.textContent = "\uD83D\uDD12";
+    }
+    if(editable) cell.onclick = () => clickCell(i);
+    return cell;
+  }
   function drawBoard(){
     if(!boardEl || !board) return;
     boardEl.innerHTML = "";
+    document.body.classList.toggle("scanning", !!board.scan);
+
+    if(board.scan){
+      const ov = el("div", "scanOv");
+      const wrap = el("div", "bd");
+      const px = Math.max(10, Math.min(24, Math.floor((window.innerHeight - 170) / 30)));
+      wrap.style.setProperty("--m", px + "px");
+      const grid = el("div", "bdGrid");
+      board.slots.forEach((piece, i) => grid.appendChild(cellFor(piece, i, false)));
+      wrap.appendChild(grid);
+      const back = el("button", "", "Back to editing");
+      back.onclick = () => { board.scan = false; drawBoard(); };
+      ov.append(wrap,
+        el("p", "", "Point your phone camera at the code. Hold it steady about 25 cm away and turn your screen brightness up."),
+        back);
+      boardEl.appendChild(ov);
+      return;
+    }
+
     boardEl.appendChild(el("h3", "", "Core Dump board"));
-    boardEl.appendChild(el("p", "",
-      "Rebuild the QR code. Click a tile, then click another tile to swap them. " +
-      "Rotate turns the selected tile upside down. The three big squares sit in three " +
-      "corners, and the outer edge of the code is white. When it looks right, press " +
-      "Scan view and point your phone at the screen."));
-    const wrap = el("div", "bd" + (board.scan ? " scan" : ""));
+    const steps = el("ol", "bdSteps");
+    ["Click a tile, then click another tile to swap them.",
+     "The three big squares belong in three corners, and the outer edge of the code is white.",
+     "Press Check to see how many tiles are right. When all are right, press Scan view."]
+      .forEach(t => steps.appendChild(el("li", "", t)));
+    boardEl.appendChild(steps);
+    const wrap = el("div", "bd");
     const grid = el("div", "bdGrid");
-    board.slots.forEach((piece, i) => {
-      const id = "tile" + (piece + 1);
-      const url = avail.indexOf(id) >= 0 ? tileUrl[teamKey(id)] : null;
-      const cell = el("div", "bdCell" + (url ? "" : " locked") + (board.sel === i && !board.scan ? " sel" : ""));
-      if(url){
-        const img = el("img");
-        img.src = url; img.alt = ""; img.draggable = false;
-        img.style.transform = board.rot[piece] ? "rotate(180deg)" : "none";
-        cell.appendChild(img);
-      }else{
-        cell.textContent = "\uD83D\uDD12";
-      }
-      cell.onclick = () => clickCell(i);
-      grid.appendChild(cell);
-    });
+    board.slots.forEach((piece, i) => grid.appendChild(cellFor(piece, i, true)));
     wrap.appendChild(grid);
     boardEl.appendChild(wrap);
     const bar = el("div", "bdBar");
-    const rotate = el("button", "ghost", "Rotate selected tile");
-    rotate.onclick = () => {
-      if(board.sel === null || board.scan) return;
-      const p = board.slots[board.sel];
-      board.rot[p] = board.rot[p] ? 0 : 180; saveBoard(); drawBoard();
-    };
-    const scan = el("button", "", board.scan ? "Back to editing" : "Scan view");
-    scan.onclick = () => { board.scan = !board.scan; board.sel = null; drawBoard(); };
+    const check = el("button", "", "Check my board");
+    check.onclick = checkBoard;
+    const scan = el("button", "", "Scan view");
+    scan.onclick = () => { board.scan = true; board.sel = null; drawBoard(); };
     const reset = el("button", "ghost", "Shuffle again");
-    reset.onclick = () => { const s = scramble(board.team + ":" + Date.now()); board.slots = s.slots; board.rot = s.rot; board.sel = null; saveBoard(); drawBoard(); };
-    bar.append(rotate, scan, reset);
+    reset.onclick = () => { const s = scramble(board.team + ":" + Date.now()); board.slots = s.slots; board.rot = s.rot; board.sel = null; board.msg = ""; saveBoard(); drawBoard(); };
+    bar.append(check, scan, reset);
+    if(ALLOW_FLIP){
+      const rotate = el("button", "ghost", "Rotate selected tile");
+      rotate.onclick = () => {
+        if(board.sel === null) return;
+        const p = board.slots[board.sel];
+        board.rot[p] = board.rot[p] ? 0 : 180; saveBoard(); drawBoard();
+      };
+      bar.appendChild(rotate);
+    }
     boardEl.appendChild(bar);
+    boardEl.appendChild(el("div", "bdMsg", board.msg));
   }
   function drawBoardFor(m){
     avail = (m.assets || []).filter(a => a.id.indexOf("tile") === 0).map(a => a.id);
     boardEl.classList.toggle("hidden", !avail.length);
-    if(!avail.length) return;
+    if(!avail.length){ document.body.classList.remove("scanning"); return; }
     if(!board || board.team !== S.team_id) loadBoard();
     avail.forEach(fetchTile);
     drawBoard();

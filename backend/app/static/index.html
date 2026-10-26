@@ -120,7 +120,18 @@
   #clear p{color:var(--text);font-size:17px;margin-bottom:14px}
   #clear .nextUp{color:var(--amber);font:600 15px var(--mono);margin:18px 0 22px}
   #clear button{background:var(--ok);color:#04201a;font-size:16px;padding:12px 28px}
-
+  #bigWarn{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;pointer-events:none}
+  #bigWarn .box{background:rgba(20,4,6,.95);border:2px solid var(--red);border-radius:10px;padding:26px 52px;
+    text-align:center;box-shadow:0 0 60px rgba(255,59,59,.45);animation:warnIn .25s ease-out}
+  #bigWarn .title{font:700 22px var(--mono);color:#fff;letter-spacing:3px}
+  #bigWarn .num{font:700 110px/1.1 var(--mono);color:var(--red)}
+  #bigWarn .sub{color:var(--dim);font-size:16px}
+  @keyframes warnIn{from{transform:scale(.8);opacity:0}to{transform:scale(1);opacity:1}}
+  .row button.choice{background:#23304a;color:var(--text);border:1px solid var(--line)}
+  #notice{position:fixed;inset:0;z-index:85;background:rgba(5,5,7,.88);display:flex;align-items:center;justify-content:center;padding:24px}
+  #notice .box{max-width:520px;background:#10131a;border:2px solid var(--red);border-radius:10px;padding:28px 34px;text-align:center;box-shadow:0 0 50px rgba(255,59,59,.4)}
+  #notice h2{color:var(--red);letter-spacing:2px;margin:0 0 10px;font-size:24px}
+  #notice p{color:var(--text);font-size:17px}
   /* Intro */
   #intro{position:fixed;inset:0;z-index:55;background:#050507;display:flex;align-items:center;justify-content:center;padding:24px}
   #intro .box{max-width:780px;width:100%}
@@ -159,9 +170,17 @@
   </div>
 </div>
 
+<div id="notice" class="hidden">
+  <div class="box">
+    <h2 id="noticeTitle"></h2>
+    <p id="noticeText"></p>
+    <button id="noticeBtn">Understood</button>
+  </div>
+</div>
 <div id="app">
   <div class="alert"><span>ALERT: HYDRA TROJAN DETECTED ON NOVA-DB02 // NOVACORP SYSTEMS COMPROMISED // THE DASHBOARD SAYS ALL CLEAR. IT IS LYING // TRUST NO ONE //</span></div>
   <div id="flash"></div>
+  <div id="bigWarn" class="hidden"></div>
   <header>
     <div class="brand"><span class="glitch" data-t="Don’t Trust the System">Don’t Trust the <b>System</b></span></div>
     <div class="stats hidden" id="stats">
@@ -220,10 +239,6 @@
               <div class="fxHead"><span>Name</span><span>Type</span><span>Size</span></div>
               <div id="fxRows"></div>
             </div>
-            <div class="fxView">
-              <div class="pts" id="fxName" style="margin-top:10px">Click a file to read it.</div>
-              <div class="termOut" id="fxText" style="margin-top:8px"></div>
-            </div>
             <details class="hidden">
               <summary>Advanced</summary>
               <div class="termOut" id="termOut"></div>
@@ -247,10 +262,12 @@
             <div id="assets"></div>
           </div>
 
-          <div class="card" style="margin-top:18px">
-            <h3>Your notes</h3>
-            <p>Write fragments and clues here. Your partner cannot see this.</p>
-            <textarea id="notes" rows="5"></textarea>
+          <div class="card hidden" id="viewCard" style="margin-top:18px">
+            <h3>File viewer</h3>
+            <div class="pts" id="fxName">Click a file to read it.</div>
+            <div class="termOut" id="fxText" style="margin-top:8px;height:360px"></div>
+          </div>
+          <textarea id="notes" class="hidden"></textarea>
           </div>
         </div>
       </div>
@@ -354,11 +371,24 @@ function begin(){
   if(sessionStorage.getItem("dts_intro")) go(); else runIntro(go);
 }
 
+function notice(key, title, text){
+  const k = "dts_notice_" + S.team_id + "_" + key;
+  if(sessionStorage.getItem(k)) return;
+  sessionStorage.setItem(k, "1");
+  $("noticeTitle").textContent = title; $("noticeText").textContent = text;
+  $("notice").classList.remove("hidden");
+}
+$("noticeBtn").onclick = () => $("notice").classList.add("hidden");
+
 async function poll(){
   if(!S) return;
   try{
     const st = await api(`/teams/${S.team_id}/state`);
     window.flags = st.flags || [];
+    if(S.role === "Analyst" && window.flags.indexOf("3:deleted") >= 0){
+      notice("del3", "YOUR PARTNER DELETED /tmp",
+        "Everything in /tmp is gone. The evidence was destroyed. Look in /var/backups: a copy may still exist.");
+    }
     window.s5 = {
   left: st.countdown_seconds,
   total: st.countdown_total,
@@ -415,6 +445,7 @@ async function termRun(cmd, silent){
   }catch(e){ if(!silent) termPrint(e.message, "err"); }
 }
 function setupTerminal(m){
+  $("viewCard").classList.toggle("hidden", !m.terminal);
   $("termCard").classList.toggle("hidden", !m.terminal);
   if(!m.terminal){ term.stage = 0; return; }
   if(term.stage !== m.stage){
@@ -675,7 +706,7 @@ function renderMission(m){
         q.choices.forEach(c => {
           const cb = document.createElement("button");
           cb.textContent = c.label;
-          if(c.danger) cb.style.background = "#8a1f1f";
+          cb.className = "choice";
           cb.onclick = () => {
             if(!c.confirm || confirm(c.confirm)) submit(q.id, c.value);
           };
@@ -710,44 +741,51 @@ function renderMission(m){
   });
 }
 
+let warnTimer = null;
+function bigWarn(message){
+  const lock = /(?:locked for|try again in)\s+(\d+)\s*s/i.exec(message);
+  const left = /(\d+)\s+tries?\s+left/i.exec(message);
+  if(!lock && !left) return false;
+  const box = $("bigWarn"); box.innerHTML = "";
+  const card = document.createElement("div"); card.className = "box";
+  const t = document.createElement("div"); t.className = "title";
+  const n = document.createElement("div"); n.className = "num";
+  const s = document.createElement("div"); s.className = "sub";
+  if(lock){
+    t.textContent = "LOCKED OUT"; n.textContent = lock[1] + "s";
+    s.textContent = "Too many wrong answers. This question is locked for a moment.";
+  }else{
+    t.textContent = "WRONG ANSWER"; n.textContent = left[1];
+    s.textContent = (left[1] === "1" ? "try" : "tries") + " left before this question locks";
+  }
+  card.append(t, n, s); box.appendChild(card); box.classList.remove("hidden");
+  clearTimeout(warnTimer); warnTimer = setTimeout(() => box.classList.add("hidden"), 1800);
+  return true;
+}
+
 async function submit(qid, forced){
-  const inp = $("in-" + qid);
-  const msg = $("msg-" + qid);
-
-  const answer = forced !== undefined
-    ? forced
-    : (inp ? inp.value.trim() : "");
-
-  if(answer === "" || answer === null || answer === undefined) return;
-
-  msg.className = "msg";
-  msg.textContent = "Checking...";
-
+  const inp = $("in-" + qid), msg = $("msg-" + qid);
+  const answer = forced !== undefined ? forced : inp.value.trim(); if(!answer) return;
+  msg.className = "msg"; msg.textContent = "Checking...";
   try{
-    const r = await post(
-      `/teams/${S.team_id}/actions`,
-      {
-        player_id: S.player_id,
-        question_id: qid,
-        answer
-      }
-    );
-
-    flash(
-      r.penalty
-        ? "Evidence destroyed. -" + r.penalty + " points"
-        : r.stage_completed
-          ? "Stage complete! +" + r.points_awarded + " points"
-          : "Correct! +" + r.points_awarded + " points"
-    );
-
+    const r = await post(`/teams/${S.team_id}/actions`, {player_id:S.player_id, question_id:qid, answer});
+    flash(r.penalty ? "Evidence destroyed. -" + r.penalty + " points" : r.stage_completed ? "Stage complete! +" + r.points_awarded + " points" : "Correct! +" + r.points_awarded + " points");
     $("flash").style.background = r.penalty ? "#ff3b3b" : "";
-
-    lastKey = "";
-    await poll();
+    lastKey = ""; await poll();
+  }catch(e){ msg.className = "msg bad"; msg.textContent = e.message; bigWarn(e.message); }
+}
+async function getHint(qid){
+  const hintEl = $("hint-" + qid), msg = $("msg-" + qid);
+  const before = parseInt($("sScore").textContent, 10);
+  try{
+    const r = await post(`/teams/${S.team_id}/hint`, {player_id:S.player_id, question_id:qid});
+    hints[curStage + ":" + qid] = r.hint;
+    hintEl.textContent = "Hint: " + r.hint;
+    $("sScore").textContent = r.score;
+    if(!isNaN(before) && r.score < before) flash("Hint used: -1 point");
   }catch(e){
-    msg.className = "msg bad";
-    msg.textContent = e.message;
+    msg.className = "msg bad"; msg.textContent = "Hint error: " + e.message;
+    console.error("getHint failed", e);
   }
 }
 

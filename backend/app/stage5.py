@@ -89,7 +89,7 @@ _TASKS = [
 ]
 _LEAVE = [
     ("avery.park", "EMP-4471", "Finance", "none"),
-    ("jordan.lee", "EMP-5120", "IT Support", "13 to 17 Oct"),
+    ("jordan.lee", "EMP-5120", "IT Support", "13 to 18 Oct"),
     ("maria.dsouza", "EMP-3308", "Operations", "none"),
     ("ben.carter", "EMP-3871", "HR","12 to 16 Oct"),
     ("priya.nair", "EMP-2290", "Admin", "14 to 15 Oct"),
@@ -217,7 +217,7 @@ MISSION = {
             ],
             "questions": [
                 {"id": "m1", "points": 10, "after": None, "answers": ["n8443"],
-                 "prompt": "Block the steady stream that is stealing the data.",
+                 "prompt": "Block the steady stream that is stealing the data.(Refer to your notes!)",
                  "pick": True, "effects": {"n8443": {"flag": "ip_blocked"}},
                  "hint": "Ignore the spikes. Look for an outside address with a perfectly flat "
                          "line, a large total and a start time in the early morning."},

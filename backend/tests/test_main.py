@@ -591,7 +591,7 @@ def test_stage3_hides_fragment_and_backups_before_the_decision() -> None:
         text = str(_mission(team, index)).lower()
         for secret in ("ks-7b20", "'answers'", "'hint'", "'effects'"):
             assert secret not in text
-    assert ".leave_notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
+    assert ".notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
     assert "No such file" in _term(team, 0, "cat /var/backups/restore.log")["output"]
     assert "nov4corp.example" in _term(
         team, 1, "cat /mail/inbox/URGENT_hydra_in_tmp.eml")["output"]
@@ -621,9 +621,9 @@ def test_stage3_keep_path_gives_the_fragment_and_no_penalty() -> None:
     assert kept.status_code == 200
     assert kept.json()["penalty"] == 0
     assert "KS-7B20" in str(_mission(team, 1)["evidence"])
-    assert ".leave_notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
+    assert ".notice.txt" in _term(team, 0, "ls -a /tmp")["output"]
 
-    for qid, ans in (("a1", ".leave_notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
+    for qid, ans in (("a1", ".notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
         assert _answer(team, 0, qid, ans).status_code == 200
     assert _mission(team, 0)["stage"] == 4
     assert _state(team)["score"] == before + 15
@@ -643,13 +643,13 @@ def test_stage3_delete_path_costs_points_and_needs_the_backup() -> None:
     assert "KS-7B20" not in str(_mission(team, 1)["evidence"])
 
     tmp = _term(team, 0, "ls -a /tmp")["output"]
-    assert ".leave_notice.txt" not in tmp
+    assert ".notice.txt" not in tmp
     assert ".deleted_by_admin.log" in tmp
-    assert ".leave_notice.txt" in _term(
+    assert ".notice.txt" in _term(
         team, 0, "ls -a /var/backups/tmp_snapshot")["output"]
     assert "KS-7B20" in _term(team, 0, "cat /var/backups/restore.log")["output"]
 
-    for qid, ans in (("a1", ".leave_notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
+    for qid, ans in (("a1", ".notice.txt"), ("a2", "EMP-5120"), ("a3", "KS-7B20")):
         assert _answer(team, 0, qid, ans).status_code == 200
     assert _mission(team, 0)["stage"] == 4
     # Monitor m1+m2 = 5, delete = 0 and -3, Analyst = 7
