@@ -26,10 +26,10 @@ MISSIONS = {
                     {"text": "IT POLICY (retired 2024): Admin password = company name + year.", "after": None},
                     {"text": "FILES: /logs/auth.log  /logs/backup.log  /home/.cache_old (hidden)", "after": "a1"},
                     {"text": "auth.log 09:02:11 login ok avery.park 10.0.4.21 note=KS-R5K5", "after": "a1"},
-                    {"text": "auth.log 09:20:55 login ok jordan.lee 10.0.4.35", "after": "a1"},
-                    {"text": "auth.log 02:30:00 login ok maria.dsouza 10.0.4.50 (maintenance window)", "after": "a1"},
+                    {"text": "auth.log 09:20:55 login ok jordan.lee 10.0.4.35 note=KS-N8M2", "after": "a1"},
+                    {"text": "auth.log 02:30:00 login ok maria.dsouza 10.0.4.50 note=KS-L9P4", "after": "a1"},
                     {"text": "auth.log 27:00:00 session opened from 203.0.113.77 note=KS-A7F3 ", "after": "a1"},
-                    {"text": "auth.log 10:05:30 login ok avery.park 10.0.4.21", "after": "a1"},
+                    {"text": "auth.log 10:05:30 login ok avery.park 10.0.4.21 note=KS-D2P7", "after": "a1"},
                     {"text": "backup.log 09:41:17 nightly backup ok", "after": "a1"},
                 ],
                 "questions": [
@@ -64,7 +64,10 @@ MISSIONS = {
                     {"text": "DASHBOARD USER LIST: avery.park, jordan.lee, maria.dsouza, svc_backup01", "after": "m1"},
                     {"text": "ALERT 7:05 session source 108.0.111.56", "after": "m1"},
                     {"text": "ALERT 09:14 Hydra_Update quarantined, no outbound connection.", "after": "m1"},
+                    {"text": "ALERT 5:45 unusual session source 203.0.113.77", "after": "m1"},
                     {"text": "ALERT 27:00:00 unusual session source 203.0.113.77", "after": "m1"},
+                    {"text": "ALERT 3:30 unusual session source 203.0.113.77", "after": "m1"},
+                    {"text": "ALERT 7:30 unusual session source 203.0.113.77", "after": "m1"},
                     {"text": "ALERT 02:30 maintenance login, maria.dsouza, approved.", "after": "m1"},
                 ],
                 "questions": [
@@ -104,7 +107,7 @@ MISSIONS = {
                     {"text": "NOTE: your partner is on the log viewer. They can see login records that you cannot.", "after": None},
                     {"text": "VAULT OPENED. FRAGMENT 2: KS-19C4 (write this down!)", "after": "a2"},
                     {"text": "A new folder named vault appeared next to vault.bin. Open it. The note inside is encrypted.", "after": "a2"},
-                    {"text": "CIPHER: this is a Caesar cipher. Every letter was moved in the alphabet by a secret number. Your partner can find that number.", "after": "a2"},
+                    {"text": "CIPHER: this is a Caesar cipher. Every letter was moved (forward/backward ? find out!) in the alphabet by a secret number. Your partner can find that number.", "after": "a2"},
                     {"text": "NOTE DECODED. Remember the task name and when it runs. It may matter later.", "after": "a3"},
                 ],
                 "questions": [
