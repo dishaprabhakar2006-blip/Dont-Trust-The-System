@@ -64,10 +64,10 @@ MISSIONS = {
                     {"text": "DASHBOARD USER LIST: avery.park, jordan.lee, maria.dsouza, svc_backup01", "after": "m1"},
                     {"text": "ALERT 7:05 session source 108.0.111.56", "after": "m1"},
                     {"text": "ALERT 09:14 Hydra_Update quarantined, no outbound connection.", "after": "m1"},
-                    {"text": "ALERT 5:45 unusual session source 203.0.113.77", "after": "m1"},
+                    {"text": "ALERT 5:45 unusual session source 106.1.234.67", "after": "m1"},
                     {"text": "ALERT 27:00:00 unusual session source 203.0.113.77", "after": "m1"},
-                    {"text": "ALERT 3:30 unusual session source 203.0.113.77", "after": "m1"},
-                    {"text": "ALERT 7:30 unusual session source 203.0.113.77", "after": "m1"},
+                    {"text": "ALERT 3:30 unusual session source 178.0.123.88", "after": "m1"},
+                    {"text": "ALERT 7:30 unusual session source 107.4.567.78", "after": "m1"},
                     {"text": "ALERT 02:30 maintenance login, maria.dsouza, approved.", "after": "m1"},
                 ],
                 "questions": [
