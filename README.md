@@ -35,6 +35,25 @@ python -m uvicorn app.main:app --app-dir backend --reload
 
 The API is available at <http://127.0.0.1:8000>. Interactive API documentation is at <http://127.0.0.1:8000/docs>.
 
+## Run with Docker
+
+Install Docker Desktop (or Docker Engine with the Compose plugin), then run these commands from the project root:
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+Open <http://localhost:8000/play/> on the Docker host. The service listens on all container interfaces and publishes port `8000` on the host, so devices on the same trusted LAN can also connect. Find the host's LAN IPv4 address with `ipconfig`, then open `http://HOST_IP:8000/play/` on another device (replace `HOST_IP` with that address). The API is available at `/docs`, and its health endpoint is `/health`.
+
+To publish a different host port, set `PORT` in `.env` (for example, `PORT=8080`), then connect using that port. Docker publishes the port on all host interfaces; allow it through Windows Firewall only on a trusted **Private network**. Do not expose this development/demo server to the public internet.
+
+The container uses the in-memory repository by default, so data is lost when it restarts. To configure Firebase, set `FIREBASE_DATABASE_URL` and `FIREBASE_SERVICE_ACCOUNT_PATH=/run/credentials/firebase.json` in `.env`, then place the service-account JSON at `credentials/firebase.json` on the host. The `credentials` directory is mounted read-only and excluded from the image. Alternatively, configure Application Default Credentials and `GOOGLE_APPLICATION_CREDENTIALS` to a path available inside the container. For a Firebase emulator running on the Docker host, use `host.docker.internal` in `FIREBASE_DATABASE_EMULATOR_HOST`.
+
+When a separate frontend on the LAN calls the API from a browser, add its exact origin (including scheme and port) to `FRONTEND_ORIGINS` in `.env`. The same-origin `/play/` page does not need an additional CORS origin.
+
+Stop the container with `docker compose down`; view logs with `docker compose logs -f app`.
+
 ## Two-device LAN demo
 
 To let a frontend on another device on the same trusted Wi-Fi reach the backend, run Uvicorn bound to all network interfaces from the project root:

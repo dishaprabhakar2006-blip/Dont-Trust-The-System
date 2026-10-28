@@ -1,0 +1,27 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      GAME_DURATION_SECONDS: "${GAME_DURATION_SECONDS:-5400}"
+      START_STAGE: "${START_STAGE:-1}"
+      STAGE5_SECONDS: "${STAGE5_SECONDS:-480}"
+      FRONTEND_ORIGINS: "${FRONTEND_ORIGINS:-}"
+      FIREBASE_DATABASE_URL: "${FIREBASE_DATABASE_URL:-}"
+      FIREBASE_SERVICE_ACCOUNT_PATH: "${FIREBASE_SERVICE_ACCOUNT_PATH:-}"
+      FIREBASE_DATABASE_EMULATOR_HOST: "${FIREBASE_DATABASE_EMULATOR_HOST:-}"
+      GOOGLE_APPLICATION_CREDENTIALS: "${GOOGLE_APPLICATION_CREDENTIALS:-}"
+    volumes:
+      - ./credentials:/run/credentials:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
